@@ -22,7 +22,8 @@ data class TalkUiState(
     val isToggleMode: Boolean = false,
     val isConnected: Boolean = false,
     val ping: Long = 0,
-    val error: String? = null
+    val error: String? = null,
+    val isSpeakerOn: Boolean = true
 )
 
 class ChannelViewModel(
@@ -209,6 +210,20 @@ class ChannelViewModel(
             if (audioRecorder.startRecording()) {
                 webSocketClient.startTalking(channelId)
             }
+        }
+    }
+
+    fun toggleSpeaker() {
+        val currentState = _uiState.value
+        val newSpeakerState = !currentState.isSpeakerOn
+        Log.d(TAG, "🔊 toggleSpeaker() - new isSpeakerOn=$newSpeakerState")
+        
+        _uiState.value = currentState.copy(isSpeakerOn = newSpeakerState)
+        
+        if (newSpeakerState) {
+            audioPlayer.startPlayback()
+        } else {
+            audioPlayer.stopPlayback()
         }
     }
 

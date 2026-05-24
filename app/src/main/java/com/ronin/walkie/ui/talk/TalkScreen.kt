@@ -36,7 +36,8 @@ fun TalkScreen(
     onLeaveChannel: () -> Unit,
     onStartTransmitting: () -> Unit,
     onStopTransmitting: () -> Unit,
-    onToggleTransmitting: () -> Unit
+    onToggleTransmitting: () -> Unit,
+    onToggleSpeaker: () -> Unit
 ) {
     var showLeaveDialog by remember { mutableStateOf(false) }
 
@@ -139,11 +140,22 @@ fun TalkScreen(
                     
                     Spacer(modifier = Modifier.width(16.dp))
                     
+                    // Lautsprecher-Status in der Bottom-Bar
                     Icon(
-                        Icons.Default.VolumeUp,
-                        contentDescription = "Lautstärke",
+                        if (uiState.isSpeakerOn) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                        contentDescription = "Lautsprecher",
                         modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = if (uiState.isSpeakerOn) {
+                            Color(0xFF4CAF50)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        if (uiState.isSpeakerOn) "Lautsprecher an" else "Lautsprecher aus",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -165,14 +177,42 @@ fun TalkScreen(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // PTT Button
-            PTTButton(
-                isTransmitting = uiState.isTransmitting,
-                isToggleMode = uiState.isToggleMode,
-                onStartTransmitting = onStartTransmitting,
-                onStopTransmitting = onStopTransmitting,
-                onToggleTransmitting = onToggleTransmitting
-            )
+            // PTT Button + Lautsprecher-Button daneben
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                PTTButton(
+                    isTransmitting = uiState.isTransmitting,
+                    isToggleMode = uiState.isToggleMode,
+                    onStartTransmitting = onStartTransmitting,
+                    onStopTransmitting = onStopTransmitting,
+                    onToggleTransmitting = onToggleTransmitting
+                )
+
+                // Lautsprecher-Button rechts neben dem PTT-Button
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 8.dp)
+                ) {
+                    IconButton(
+                        onClick = onToggleSpeaker,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            if (uiState.isSpeakerOn) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                            contentDescription = "Lautsprecher",
+                            tint = if (uiState.isSpeakerOn) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+            }
 
             // Toggle-Status Text
             if (uiState.isToggleMode) {
@@ -258,18 +298,6 @@ fun MemberItem(
     isTalking: Boolean,
     isSelf: Boolean
 ) {
-    // Pulsierende Animation für sprechende Benutzer
-    val infiniteTransition = rememberInfiniteTransition(label = "talking")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = if (isTalking) 1.15f else 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(600, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse"
-    )
-
     val statusColor = when {
         isTalking && isSelf -> Color(0xFFF44336) // Rot für eigenes Senden
         isTalking -> Color(0xFF4CAF50) // Grün für andere Sprecher
@@ -290,8 +318,7 @@ fun MemberItem(
 
     Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .scale(if (isTalking) pulseScale else 1f),
+            .fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isTalking) {
@@ -308,7 +335,7 @@ fun MemberItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Status-Indikator
+            // Status-Indikator mit grünem Border wenn sprechend
             Box(
                 modifier = Modifier
                     .size(32.dp)
@@ -316,7 +343,7 @@ fun MemberItem(
                     .background(statusColor.copy(alpha = 0.2f))
                     .then(
                         if (isTalking) Modifier.border(
-                            2.dp,
+                            3.dp,
                             statusColor,
                             CircleShape
                         ) else Modifier
@@ -428,45 +455,43 @@ fun PTTButton(
         }
 
         // Haupt-PTT-Button
-        Button(
-            onClick = {
-                if (isTransmitting && isToggleMode) {
-                    // Toggle ausschalten
-                    onToggleTransmitting()
-                } else if (!isTransmitting) {
-                    // Einfacher Klick = Toggle starten
-                    onToggleTransmitting()
-                }
-            },
+        // Wir verwenden einen Box mit pointerInput für präzise Press/Release-Erkennung
+        // und einen separaten clickable für den Toggle-Klick
+        Box(
             modifier = Modifier
                 .size(180.dp)
                 .scale(if (isTransmitting) pulseScale else 1f)
                 .pointerInput(isToggleMode) {
                     detectTapGestures(
+                        onTap = {
+                            // Einfacher Tipp = Toggle umschalten
+                            onToggleTransmitting()
+                        },
                         onPress = {
+                            // Gedrückt halten = Push-to-Talk (nur wenn nicht im Toggle-Modus)
                             if (!isToggleMode) {
                                 onStartTransmitting()
                                 tryAwaitRelease()
-                                if (!isToggleMode) {
-                                    onStopTransmitting()
-                                }
+                                onStopTransmitting()
                             }
                         }
                     )
                 },
-            shape = CircleShape,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = buttonColor,
-                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
-            ),
-            elevation = ButtonDefaults.buttonElevation(
-                defaultElevation = if (isTransmitting) 12.dp else 4.dp,
-                pressedElevation = 8.dp
-            )
+            contentAlignment = Alignment.Center
         ) {
+            // Hintergrund-Kreis
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .background(buttonColor)
+            )
+
+            // Inhalt
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxSize()
             ) {
                 Icon(
                     buttonIcon,

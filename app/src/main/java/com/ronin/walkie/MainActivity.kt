@@ -262,6 +262,10 @@ fun WalkieNavHost(app: WalkieApplication) {
                 onToggleTransmitting = {
                     Log.d("MainActivity", "🔄 onToggleTransmitting called")
                     channelViewModel.toggleTransmitting()
+                },
+                onToggleSpeaker = {
+                    Log.d("MainActivity", "🔊 onToggleSpeaker called")
+                    channelViewModel.toggleSpeaker()
                 }
             )
         }

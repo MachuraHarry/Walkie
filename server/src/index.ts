@@ -305,10 +305,15 @@ function handleCreateChannel(ws: WebSocket, payload: { name: string; description
   debugLog('CREATE', `✅ Channel #${id} "${name}" created by "${info.username}"`);
   debugLog('CREATE', `Total channels: ${channels.size}`);
 
-  sendToClient(ws, {
-    type: 'channel_created',
-    payload: { channel: { id, name, description, color, created_by: info.username, created_at: channel.createdAt.toISOString(), is_active: true, member_count: 1 } }
-  });
+  // Allen verbundenen Clients Bescheid geben, damit alle die Channel-Liste aktualisieren
+  const channelPayload = { channel: { id, name, description, color, created_by: info.username, created_at: channel.createdAt.toISOString(), is_active: true, member_count: 1 } };
+  debugLog('CREATE', `Broadcasting channel_created to all ${clients.size} clients`);
+  for (const [clientWs] of clients) {
+    sendToClient(clientWs, {
+      type: 'channel_created',
+      payload: channelPayload
+    });
+  }
 }
 
 function handleJoinChannel(ws: WebSocket, payload: { channelId: number }): void {
