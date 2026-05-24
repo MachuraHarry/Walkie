@@ -6,6 +6,7 @@ import android.os.Build
 import android.util.Log
 import com.ronin.walkie.audio.AudioPlayer
 import com.ronin.walkie.audio.AudioRecorder
+import com.ronin.walkie.audio.SoundEffectPlayer
 import com.ronin.walkie.network.WalkieWebSocketClient
 
 class WalkieApplication : Application() {
@@ -65,6 +66,9 @@ class WalkieApplication : Application() {
     lateinit var audioPlayer: AudioPlayer
         private set
 
+    lateinit var soundEffectPlayer: SoundEffectPlayer
+        private set
+
     private var currentActivity: Activity? = null
 
     override fun onCreate() {
@@ -75,6 +79,8 @@ class WalkieApplication : Application() {
         audioPlayer = AudioPlayer()
         // AudioManager für Audio-Fokus setzen
         audioPlayer.setAudioManager(this)
+        soundEffectPlayer = SoundEffectPlayer()
+        soundEffectPlayer.setContext(this)
         Log.d(TAG, "✅ WalkieApplication initialized. SERVER_URL=$SERVER_URL")
     }
 
@@ -83,6 +89,8 @@ class WalkieApplication : Application() {
         currentActivity = activity
         audioRecorder = AudioRecorder(activity)
         audioRecorder.setWebSocketClient(webSocketClient)
+        // SoundEffectPlayer mit Activity-Kontext aktualisieren (zuverlässiger für MediaPlayer)
+        soundEffectPlayer.setContext(activity)
         Log.d(TAG, "✅ AudioRecorder created and linked to WebSocket")
     }
 
@@ -119,6 +127,7 @@ class WalkieApplication : Application() {
         super.onTerminate()
         Log.d(TAG, "💀 WalkieApplication.onTerminate()")
         audioPlayer.stopPlayback()
+        soundEffectPlayer.release()
         webSocketClient.cancelReconnect()
         if (webSocketClient.isConnected) {
             webSocketClient.close()

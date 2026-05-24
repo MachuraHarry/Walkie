@@ -125,6 +125,7 @@ fun WalkieApp(
                     webSocketClient = webSocketClient,
                     audioRecorder = audioRecorder,
                     audioPlayer = audioPlayer,
+                    soundEffectPlayer = WalkieApplication.instance.soundEffectPlayer,
                     username = currentUsername,
                     savedStateHandle = SavedStateHandle()
                 ) as T

@@ -7,6 +7,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.ronin.walkie.audio.AudioPlayer
 import com.ronin.walkie.audio.AudioRecorder
+import com.ronin.walkie.audio.SoundEffectPlayer
 import com.ronin.walkie.model.Channel
 import com.ronin.walkie.model.ServerMessage
 import com.ronin.walkie.network.WalkieWebSocketClient
@@ -42,6 +43,7 @@ class ChannelViewModel(
     private val webSocketClient: WalkieWebSocketClient,
     private val audioRecorder: AudioRecorder,
     private val audioPlayer: AudioPlayer,
+    private val soundEffectPlayer: SoundEffectPlayer,
     private val username: String,
     private val savedStateHandle: SavedStateHandle = SavedStateHandle()
 ) : AndroidViewModel(application) {
@@ -109,12 +111,22 @@ class ChannelViewModel(
                 _uiState.value = _uiState.value.copy(
                     talkingUsers = _uiState.value.talkingUsers + talkingUser
                 )
+                // ON-Sound abspielen, wenn ein ANDERER User zu sprechen beginnt
+                // (der Sender selbst spielt den Sound bereits in startTransmitting())
+                if (talkingUser != username) {
+                    soundEffectPlayer.playOnSound()
+                }
             }
             "user_stopped_talking" -> {
                 val stoppedUser = message.payload?.get("username") as? String ?: return
                 _uiState.value = _uiState.value.copy(
                     talkingUsers = _uiState.value.talkingUsers - stoppedUser
                 )
+                // OFF-Sound abspielen, wenn ein ANDERER User aufhört zu sprechen
+                // (der Sender selbst spielt den Sound bereits in stopTransmitting())
+                if (stoppedUser != username) {
+                    soundEffectPlayer.playOffSound()
+                }
             }
             "connected" -> {
                 _uiState.value = _uiState.value.copy(
@@ -223,6 +235,8 @@ class ChannelViewModel(
         _uiState.value = _uiState.value.copy(isTransmitting = true)
         webSocketClient.startTalking(channelId)
         audioRecorder.startRecording()
+        // ON-Sound für den Sender selbst abspielen
+        soundEffectPlayer.playOnSound()
     }
 
     fun stopTransmitting() {
@@ -231,6 +245,8 @@ class ChannelViewModel(
         _uiState.value = _uiState.value.copy(isTransmitting = false)
         webSocketClient.stopTalking(channelId)
         audioRecorder.stopRecording()
+        // OFF-Sound für den Sender selbst abspielen
+        soundEffectPlayer.playOffSound()
     }
 
     fun toggleTransmitting() {
@@ -241,12 +257,16 @@ class ChannelViewModel(
             audioRecorder.stopRecording()
             val channelId = _uiState.value.channel?.id ?: return
             webSocketClient.stopTalking(channelId)
+            // OFF-Sound für den Sender selbst abspielen
+            soundEffectPlayer.playOffSound()
         } else {
             // Toggle einschalten
             _uiState.value = currentState.copy(isToggleMode = true, isTransmitting = true)
             audioRecorder.startRecording()
             val channelId = _uiState.value.channel?.id ?: return
             webSocketClient.startTalking(channelId)
+            // ON-Sound für den Sender selbst abspielen
+            soundEffectPlayer.playOnSound()
         }
     }
 
