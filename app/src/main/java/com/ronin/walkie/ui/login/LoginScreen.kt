@@ -30,7 +30,7 @@ fun LoginScreen(
     onConnect: () -> Unit,
     onClearError: () -> Unit
 ) {
-    var username by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf(uiState.username) }
     var isError by remember { mutableStateOf(false) }
     var hasAttemptedConnection by remember { mutableStateOf(false) }
 

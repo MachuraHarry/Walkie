@@ -1,6 +1,7 @@
 package com.ronin.walkie.viewmodel
 
 import android.app.Application
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
@@ -32,7 +33,11 @@ class LoginViewModel(
         private const val TAG = "LoginVM"
         private const val LOGIN_TIMEOUT_MS = 10000L
         private const val MAX_CONNECTION_ATTEMPTS = 3
+        private const val PREFS_NAME = "walkie_prefs"
+        private const val KEY_SAVED_USERNAME = "saved_username"
     }
+
+    private val prefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
@@ -43,11 +48,18 @@ class LoginViewModel(
     init {
         Log.d(TAG, "🏗️ LoginViewModel created")
 
-        // SavedState wiederherstellen
-        savedStateHandle.get<String>("saved_username")?.let { savedUsername ->
-            if (savedUsername.isNotEmpty()) {
-                _uiState.value = _uiState.value.copy(username = savedUsername)
-                Log.d(TAG, "   Restored username from SavedStateHandle: '$savedUsername'")
+        // Gespeicherten Usernamen aus SharedPreferences wiederherstellen (überlebt App-Neustarts)
+        val savedUsername = prefs.getString(KEY_SAVED_USERNAME, "") ?: ""
+        if (savedUsername.isNotEmpty()) {
+            _uiState.value = _uiState.value.copy(username = savedUsername)
+            Log.d(TAG, "   Restored username from SharedPreferences: '$savedUsername'")
+        }
+
+        // SavedState wiederherstellen (für Process Recreation)
+        savedStateHandle.get<String>("saved_username")?.let { savedStateUsername ->
+            if (savedStateUsername.isNotEmpty() && savedUsername.isEmpty()) {
+                _uiState.value = _uiState.value.copy(username = savedStateUsername)
+                Log.d(TAG, "   Restored username from SavedStateHandle: '$savedStateUsername'")
             }
         }
 
@@ -93,8 +105,11 @@ class LoginViewModel(
                     isLoggedIn = true,
                     error = null
                 )
-                // Username speichern
+                // Username in SavedStateHandle speichern (für Process Recreation)
                 savedStateHandle["saved_username"] = _uiState.value.username
+                // Username dauerhaft in SharedPreferences speichern (überlebt App-Neustarts)
+                prefs.edit().putString(KEY_SAVED_USERNAME, _uiState.value.username).apply()
+                Log.d(TAG, "   Saved username to SharedPreferences: '${_uiState.value.username}'")
             }
             "login_error" -> {
                 val errorMsg = message.payload?.get("message") as? String ?: "Login fehlgeschlagen"
