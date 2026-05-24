@@ -170,7 +170,9 @@ class ChannelViewModel(
     }
 
     /**
-     * Überwacht regelmäßig die Verbindungsqualität.
+     * Überwacht regelmäßig die Verbindungsqualität und den Headset-Status.
+     * Der Headset-Check dient als Fallback, falls der BroadcastReceiver
+     * Ereignisse wie Bluetooth-Wiederverbindung nicht zuverlässig empfängt.
      */
     private fun startPingMonitor() {
         pingJob?.cancel()
@@ -190,9 +192,28 @@ class ChannelViewModel(
                         )
                     }
                 }
+
+                // Fallback: Headset-Status regelmäßig prüfen
+                // (BroadcastReceiver kann Ereignisse wie Bluetooth-Wiederverbindung verlieren)
+                val currentHeadsetPlugged = audioPlayer.isHeadsetPlugged()
+                val currentSpeakerOn = audioPlayer.isSpeakerOn()
+                if (currentHeadsetPlugged != _uiState.value.isHeadsetPlugged ||
+                    currentSpeakerOn != _uiState.value.isSpeakerOn) {
+                    Log.d(TAG, "🎧 Headset state mismatch detected in monitor: " +
+                        "plugged=${_uiState.value.isHeadsetPlugged}->$currentHeadsetPlugged, " +
+                        "speaker=${_uiState.value.isSpeakerOn}->$currentSpeakerOn")
+                    soundEffectPlayer.setHeadsetPlugged(currentHeadsetPlugged)
+                    soundEffectPlayer.setSpeakerphoneOn(currentSpeakerOn)
+                    audioRecorder.setHeadsetPlugged(currentHeadsetPlugged)
+                    _uiState.value = _uiState.value.copy(
+                        isHeadsetPlugged = currentHeadsetPlugged,
+                        isSpeakerOn = currentSpeakerOn
+                    )
+                }
             }
         }
     }
+
 
     /**
      * Registriert einen Callback für Headset-Status-Änderungen vom AudioPlayer.
