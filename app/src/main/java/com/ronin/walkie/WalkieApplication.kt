@@ -2,6 +2,7 @@ package com.ronin.walkie
 
 import android.app.Activity
 import android.app.Application
+import android.content.Intent
 import android.os.Build
 import android.util.Log
 import com.ronin.walkie.audio.AudioPlayer
@@ -120,6 +121,77 @@ class WalkieApplication : Application() {
         if (webSocketClient.isConnected) {
             Log.d(TAG, "   -> Closing WebSocket")
             webSocketClient.close()
+        }
+    }
+
+    /**
+     * Startet den Foreground Service, damit die App auch im Hintergrund weiterläuft.
+     * Sollte aufgerufen werden, wenn der Benutzer einem Channel beitritt.
+     */
+    fun startForegroundService(channelName: String) {
+        Log.d(TAG, "🚀 Starting foreground service for channel: $channelName")
+        try {
+            val intent = Intent(this, WalkieForegroundService::class.java).apply {
+                action = WalkieForegroundService.ACTION_START
+                putExtra(WalkieForegroundService.EXTRA_CHANNEL_NAME, channelName)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+            Log.d(TAG, "✅ Foreground service intent sent")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error starting foreground service", e)
+        }
+    }
+
+    /**
+     * Stoppt den Foreground Service.
+     * Sollte aufgerufen werden, wenn der Benutzer den Channel verlässt.
+     */
+    fun stopForegroundService() {
+        Log.d(TAG, "🛑 Stopping foreground service")
+        try {
+            val intent = Intent(this, WalkieForegroundService::class.java).apply {
+                action = WalkieForegroundService.ACTION_STOP
+            }
+            startService(intent)
+            Log.d(TAG, "✅ Foreground service stop intent sent")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error stopping foreground service", e)
+        }
+    }
+
+    /**
+     * Meldet PTT-Start an den Foreground Service.
+     * Die Notification zeigt dann "🎤 Sende..." mit Live-Timer.
+     */
+    fun notifyPttStarted() {
+        Log.d(TAG, "🔴 Notifying foreground service: PTT started")
+        try {
+            val intent = Intent(this, WalkieForegroundService::class.java).apply {
+                action = WalkieForegroundService.ACTION_PTT_START
+            }
+            startService(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error notifying PTT start", e)
+        }
+    }
+
+    /**
+     * Meldet PTT-Stopp an den Foreground Service.
+     * Die Notification zeigt wieder den normalen Status.
+     */
+    fun notifyPttStopped() {
+        Log.d(TAG, "🟢 Notifying foreground service: PTT stopped")
+        try {
+            val intent = Intent(this, WalkieForegroundService::class.java).apply {
+                action = WalkieForegroundService.ACTION_PTT_STOP
+            }
+            startService(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error notifying PTT stop", e)
         }
     }
 

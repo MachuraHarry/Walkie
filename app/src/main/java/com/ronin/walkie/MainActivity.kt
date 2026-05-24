@@ -1,10 +1,15 @@
 package com.ronin.walkie
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -52,6 +57,10 @@ class MainActivity : ComponentActivity() {
         app.setCurrentActivity(this)
         audioRecorder = app.audioRecorder
 
+        // POST_NOTIFICATIONS Permission anfordern (ab Android 13)
+        // Notwendig, damit die Foreground Service Notification angezeigt wird
+        requestNotificationPermission()
+
         enableEdgeToEdge()
 
         setContent {
@@ -70,9 +79,57 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Fordert die POST_NOTIFICATIONS-Berechtigung an (ab Android 13 / API 33).
+     * Ohne diese Berechtigung wird die Foreground Service Notification nicht angezeigt.
+     */
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // API 33+
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                Log.d(TAG, "📋 Requesting POST_NOTIFICATIONS permission")
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    1002
+                )
+            } else {
+                Log.d(TAG, "✅ POST_NOTIFICATIONS already granted")
+            }
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        Log.d(TAG, "⏸️ MainActivity.onStop() - App geht in den Hintergrund")
+        // Audio-Playback pausieren (wird bei onStart() neu gestartet)
+        // ABER: Aufnahme NICHT stoppen, wenn PTT aktiv ist!
+        // Der Foreground Service hält die WebSocket-Verbindung und Audio-Ressourcen am Leben.
+        if (!audioRecorder.isRecording()) {
+            audioPlayer.stopPlayback()
+        } else {
+            Log.d(TAG, "   PTT ist aktiv - Aufnahme läuft im Hintergrund weiter!")
+            // Playback trotzdem pausieren (wir hören ja eh nichts, wenn wir selbst senden)
+            audioPlayer.stopPlayback()
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        Log.d(TAG, "▶️ MainActivity.onStart() - App kommt in den Vordergrund")
+        // Audio-Playback neu starten, wenn wir in einem Channel sind
+        // (die WebSocket-Callbacks sind noch registriert)
+        if (!audioPlayer.isPlaying()) {
+            audioPlayer.startPlayback()
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         Log.d(TAG, "💀 MainActivity.onDestroy()")
+        // Foreground Service stoppen, wenn die Activity endgültig zerstört wird
+        app.stopForegroundService()
         audioRecorder.stopRecording()
         audioPlayer.stopPlayback()
     }
@@ -192,10 +249,19 @@ fun WalkieApp(
             }
 
             "talk" -> {
+                // Foreground Service starten, sobald wir im Talk-Screen sind
+                LaunchedEffect(currentChannel) {
+                    if (currentChannel != null) {
+                        WalkieApplication.instance.startForegroundService(currentChannel!!.name)
+                    }
+                }
+
                 TalkScreen(
                     uiState = talkUiState,
                     username = currentUsername,
                     onLeaveChannel = {
+                        // Foreground Service stoppen beim Verlassen des Channels
+                        WalkieApplication.instance.stopForegroundService()
                         channelViewModel.leaveChannel()
                         currentChannel = null
                         currentScreen = "channels"

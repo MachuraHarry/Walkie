@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.ronin.walkie.WalkieApplication
 import com.ronin.walkie.audio.AudioPlayer
 import com.ronin.walkie.audio.AudioRecorder
 import com.ronin.walkie.audio.SoundEffectPlayer
@@ -319,6 +320,8 @@ class ChannelViewModel(
         audioRecorder.startRecording()
         // ON-Sound für den Sender selbst abspielen
         soundEffectPlayer.playOnSound()
+        // Foreground Service benachrichtigen: PTT ist aktiv (für Notification-Timer)
+        WalkieApplication.instance.notifyPttStarted()
     }
 
     fun stopTransmitting() {
@@ -330,6 +333,8 @@ class ChannelViewModel(
         audioRecorder.stopRecording()
         // OFF-Sound für den Sender selbst abspielen
         soundEffectPlayer.playOffSound()
+        // Foreground Service benachrichtigen: PTT ist beendet
+        WalkieApplication.instance.notifyPttStopped()
     }
 
 
@@ -344,6 +349,8 @@ class ChannelViewModel(
             webSocketClient.stopTalking(channelId)
             // OFF-Sound für den Sender selbst abspielen
             soundEffectPlayer.playOffSound()
+            // Foreground Service benachrichtigen: PTT ist beendet
+            WalkieApplication.instance.notifyPttStopped()
         } else {
             // Toggle einschalten
             Log.d(TAG, "🔒 Toggle ON")
@@ -364,6 +371,8 @@ class ChannelViewModel(
             if (!currentState.isTransmitting) {
                 soundEffectPlayer.playOnSound()
             }
+            // Foreground Service benachrichtigen: PTT ist aktiv
+            WalkieApplication.instance.notifyPttStarted()
         }
     }
 
