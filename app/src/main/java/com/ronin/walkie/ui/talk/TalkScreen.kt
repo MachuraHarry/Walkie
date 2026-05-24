@@ -4,8 +4,6 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -218,14 +217,14 @@ fun TalkScreen(
             if (uiState.isToggleMode) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    "🔒 Dauer-Senden aktiv – Zum Beenden tippen",
+                    "🔒 Dauer-Senden aktiv – Button nach unten ziehen zum Beenden",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.tertiary
                 )
             } else {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    "👆 Gedrückt halten oder einmal tippen für Dauer-Modus",
+                    "👆 Gedrückt halten oder nach oben ziehen für Dauer-Modus",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -394,12 +393,21 @@ fun PTTButton(
     onStopTransmitting: () -> Unit,
     onToggleTransmitting: () -> Unit
 ) {
+    // Lokaler Drag-Offset in Pixeln (wie weit wurde der Button nach oben/unten gezogen)
+    var dragOffsetPx by remember { mutableFloatStateOf(0f) }
+    // Ob der Finger gerade auf dem Button ist
+    var isFingerDown by remember { mutableStateOf(false) }
+
+    val density = LocalDensity.current
+    // Schwellwert fürs Einrasten (80dp in Pixel)
+    val lockThresholdPx = with(density) { 80.dp.toPx() }
+
     // Animationen
     val infiniteTransition = rememberInfiniteTransition(label = "ptt")
     
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = if (isTransmitting) 1.08f else 1f,
+        targetValue = if (isTransmitting || isToggleMode) 1.08f else 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(500, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -417,20 +425,45 @@ fun PTTButton(
         label = "waveAlpha"
     )
 
+    // Ziel-Offset in dp für die Animation
+    val targetOffsetDp = when {
+        isToggleMode -> -80f // Eingerastet = 80dp nach oben
+        isFingerDown -> with(density) { (dragOffsetPx / density.density).coerceIn(-80f, 0f) }
+        else -> 0f // Zurückspringen
+    }
+
+    // Sanfte Animation des Drag-Offsets
+    val animatedDragOffset by animateFloatAsState(
+        targetValue = targetOffsetDp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "dragOffset"
+    )
+
+    // Lock-Zone Alpha (wie nah am Einrasten)
+    val lockZoneProgress = if (!isToggleMode && isFingerDown) {
+        (-dragOffsetPx / lockThresholdPx).coerceIn(0f, 1f)
+    } else if (isToggleMode) {
+        1f
+    } else {
+        0f
+    }
+
     val buttonColor = when {
-        isTransmitting && isToggleMode -> Color(0xFFFF5722) // Orange für Toggle
-        isTransmitting -> Color(0xFFF44336) // Rot für gedrückt
+        isToggleMode -> Color(0xFFFF5722) // Orange für eingerastet
+        isTransmitting -> Color(0xFFF44336) // Rot für Push-to-Talk
         else -> MaterialTheme.colorScheme.surfaceVariant // Grau für idle
     }
 
     val buttonIcon = when {
-        isTransmitting && isToggleMode -> Icons.Default.Lock
-        isTransmitting -> Icons.Default.Mic
+        isToggleMode -> Icons.Default.Lock
         else -> Icons.Default.Mic
     }
 
     val buttonText = when {
-        isTransmitting && isToggleMode -> "DAUER-SENDEN"
+        isToggleMode -> "DAUER-SENDEN"
         isTransmitting -> "SENDET"
         else -> "HALTEN & SPRECHEN"
     }
@@ -439,8 +472,8 @@ fun PTTButton(
         contentAlignment = Alignment.Center,
         modifier = Modifier.padding(vertical = 16.dp)
     ) {
-        // Schallwellen-Ringe (nur beim Senden)
-        if (isTransmitting) {
+        // Schallwellen-Ringe
+        if (isTransmitting || isToggleMode) {
             repeat(3) { index ->
                 Box(
                     modifier = Modifier
@@ -454,28 +487,101 @@ fun PTTButton(
             }
         }
 
+        // Lock-Zone visuelles Feedback (Balken über dem Button)
+        if (lockZoneProgress > 0f) {
+            Box(
+                modifier = Modifier
+                    .offset(y = (animatedDragOffset - 130).dp)
+                    .size(40.dp, (40 * lockZoneProgress).dp)
+                    .alpha(lockZoneProgress)
+                    .background(
+                        Color(0xFFFF5722).copy(alpha = 0.3f * lockZoneProgress),
+                        RoundedCornerShape(8.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (lockZoneProgress > 0.7f) {
+                    Text("🔒", fontSize = 16.sp)
+                } else {
+                    Text("⬆", fontSize = 16.sp, color = Color(0xFFFF5722))
+                }
+            }
+        }
+
         // Haupt-PTT-Button
-        // Wir verwenden einen Box mit pointerInput für präzise Press/Release-Erkennung
-        // und einen separaten clickable für den Toggle-Klick
         Box(
             modifier = Modifier
+                .offset(y = animatedDragOffset.dp)
                 .size(180.dp)
-                .scale(if (isTransmitting) pulseScale else 1f)
+                .scale(if (isTransmitting || isToggleMode) pulseScale else 1f)
                 .pointerInput(isToggleMode) {
-                    detectTapGestures(
-                        onTap = {
-                            // Einfacher Tipp = Toggle umschalten
-                            onToggleTransmitting()
-                        },
-                        onPress = {
-                            // Gedrückt halten = Push-to-Talk (nur wenn nicht im Toggle-Modus)
+                    // Endlosschleife: nach jeder Geste neu starten
+                    while (true) {
+                        // Niedrige Pointer-Ebene für sofortige Press-Reaktion
+                        awaitPointerEventScope {
+                            // Warte auf ersten Finger-Kontakt
+                            val down = awaitPointerEvent()
+                            val downChange = down.changes.firstOrNull() ?: return@awaitPointerEventScope
+                            downChange.consume()
+                            
+                            val downY = downChange.position.y
+                            
                             if (!isToggleMode) {
+                                // ✅ Finger runter → SOFORT senden starten
+                                isFingerDown = true
+                                dragOffsetPx = 0f
                                 onStartTransmitting()
-                                tryAwaitRelease()
+                            }
+                            
+                            var hasLocked = false
+                            
+                            // Verarbeite Bewegungen während Finger unten ist
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull() ?: break
+                                
+                                if (!change.pressed) break // Finger losgelassen
+                                
+                                val currentY = change.position.y
+                                val offsetY = currentY - downY
+                                
+                                if (!isToggleMode && !hasLocked) {
+                                    // Drag nach oben verfolgen (negativ = nach oben)
+                                    dragOffsetPx = offsetY.coerceAtMost(0f)
+                                    
+                                    // Prüfe auf Einrasten
+                                    if (offsetY <= -lockThresholdPx) {
+                                        hasLocked = true
+                                        isFingerDown = false
+                                        dragOffsetPx = 0f
+                                        onStopTransmitting()
+                                        onToggleTransmitting()
+                                        change.consume()
+                                        break
+                                    }
+                                } else if (isToggleMode) {
+                                    // Im eingerasteten Modus: nach unten ziehen zum Lösen
+                                    dragOffsetPx = offsetY.coerceAtLeast(0f)
+                                    
+                                    if (offsetY >= lockThresholdPx) {
+                                        dragOffsetPx = 0f
+                                        onToggleTransmitting()
+                                        change.consume()
+                                        break
+                                    }
+                                }
+                                
+                                change.consume()
+                            }
+                            
+                            // Finger losgelassen ohne Einrasten
+                            if (!isToggleMode && !hasLocked) {
+                                isFingerDown = false
+                                dragOffsetPx = 0f
                                 onStopTransmitting()
                             }
                         }
-                    )
+                    }
                 },
             contentAlignment = Alignment.Center
         ) {
@@ -497,7 +603,7 @@ fun PTTButton(
                     buttonIcon,
                     contentDescription = "PTT",
                     modifier = Modifier.size(48.dp),
-                    tint = if (isTransmitting) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = if (isTransmitting || isToggleMode) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -506,7 +612,7 @@ fun PTTButton(
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,
                     textAlign = TextAlign.Center,
-                    color = if (isTransmitting) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (isTransmitting || isToggleMode) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

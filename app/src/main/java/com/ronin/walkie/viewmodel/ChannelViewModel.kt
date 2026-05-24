@@ -1,14 +1,14 @@
 package com.ronin.walkie.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.ronin.walkie.audio.AudioPlayer
+import com.ronin.walkie.audio.AudioRecorder
 import com.ronin.walkie.model.Channel
 import com.ronin.walkie.model.ServerMessage
-import com.ronin.walkie.model.TalkingStatus
-import com.ronin.walkie.network.SignalingClient
 import com.ronin.walkie.network.WalkieWebSocketClient
-import com.ronin.walkie.webrtc.WebRTCManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +21,7 @@ data class TalkUiState(
     val isTransmitting: Boolean = false,
     val isToggleMode: Boolean = false,
     val isConnected: Boolean = false,
+    val isSpeakerOn: Boolean = true,
     val ping: Long = 0,
     val error: String? = null
 )
@@ -28,17 +29,20 @@ data class TalkUiState(
 class ChannelViewModel(
     application: Application,
     private val webSocketClient: WalkieWebSocketClient,
-    private val signalingClient: SignalingClient,
-    private val webRTCManager: WebRTCManager,
+    private val audioRecorder: AudioRecorder,
+    private val audioPlayer: AudioPlayer,
     private val username: String
 ) : AndroidViewModel(application) {
+
+    companion object {
+        private const val TAG = "ChannelViewModel"
+    }
 
     private val _uiState = MutableStateFlow(TalkUiState())
     val uiState: StateFlow<TalkUiState> = _uiState.asStateFlow()
 
     init {
         observeMessages()
-        setupWebRTCCallbacks()
     }
 
     private fun observeMessages() {
@@ -49,45 +53,15 @@ class ChannelViewModel(
         }
     }
 
-    private fun setupWebRTCCallbacks() {
-        webRTCManager.onRemoteAudioStarted = { peerId ->
-            _uiState.value = _uiState.value.copy(
-                talkingUsers = _uiState.value.talkingUsers + peerId
-            )
-        }
-        webRTCManager.onRemoteAudioStopped = { peerId ->
-            _uiState.value = _uiState.value.copy(
-                talkingUsers = _uiState.value.talkingUsers - peerId
-            )
-        }
-    }
-
     private fun handleMessage(message: ServerMessage) {
         when (message.type) {
             "user_list" -> {
                 val users = (message.payload?.get("users") as? List<*>)?.map { it.toString() } ?: emptyList()
                 _uiState.value = _uiState.value.copy(users = users)
-
-                // WebRTC-Verbindungen zu allen anderen Nutzern aufbauen
-                val channelId = _uiState.value.channel?.id ?: return
-                for (user in users) {
-                    if (user != username && !isPeerConnected(user)) {
-                        webRTCManager.createPeerConnection(user, channelId)
-                        webRTCManager.createOffer(user, channelId)
-                    }
-                }
             }
             "user_joined" -> {
-                val joinedUser = message.payload?.get("username") as? String ?: return
                 val users = (message.payload?.get("users") as? List<*>)?.map { it.toString() } ?: emptyList()
                 _uiState.value = _uiState.value.copy(users = users)
-
-                // WebRTC-Verbindung zum neuen Nutzer aufbauen
-                val channelId = _uiState.value.channel?.id ?: return
-                if (joinedUser != username) {
-                    webRTCManager.createPeerConnection(joinedUser, channelId)
-                    webRTCManager.createOffer(joinedUser, channelId)
-                }
             }
             "user_left" -> {
                 val leftUser = message.payload?.get("username") as? String ?: return
@@ -95,7 +69,6 @@ class ChannelViewModel(
                     users = _uiState.value.users - leftUser,
                     talkingUsers = _uiState.value.talkingUsers - leftUser
                 )
-                webRTCManager.disconnectPeer(leftUser)
             }
             "user_talking" -> {
                 val talkingUser = message.payload?.get("username") as? String ?: return
@@ -109,9 +82,6 @@ class ChannelViewModel(
                     talkingUsers = _uiState.value.talkingUsers - stoppedUser
                 )
             }
-            "signal" -> {
-                handleSignal(message.payload)
-            }
             "connected" -> {
                 _uiState.value = _uiState.value.copy(isConnected = true)
             }
@@ -121,40 +91,19 @@ class ChannelViewModel(
         }
     }
 
-    private fun handleSignal(payload: Map<String, Any>?) {
-        if (payload == null) return
-
-        val signal = signalingClient.parseSignal(payload) ?: return
-
-        when (signal.type) {
-            "offer" -> {
-                val offerData = signal.data as? Map<*, *>
-                @Suppress("UNCHECKED_CAST")
-                webRTCManager.handleOffer(offerData as? Map<String, Any> ?: return, signal.from, signal.channelId)
-            }
-            "answer" -> {
-                val answerData = signal.data as? Map<*, *>
-                @Suppress("UNCHECKED_CAST")
-                webRTCManager.handleAnswer(answerData as? Map<String, Any> ?: return, signal.from)
-            }
-            "ice_candidate" -> {
-                val candidateData = signal.data as? Map<*, *>
-                @Suppress("UNCHECKED_CAST")
-                webRTCManager.handleIceCandidate(candidateData as? Map<String, Any> ?: return, signal.from)
-            }
-        }
-    }
-
     fun joinChannel(channel: Channel) {
         _uiState.value = _uiState.value.copy(channel = channel)
+        audioRecorder.setChannelId(channel.id)
+        audioPlayer.connectToWebSocket(webSocketClient)
+        audioPlayer.startPlayback()
         webSocketClient.joinChannel(channel.id)
-        webRTCManager.initialize()
     }
 
     fun leaveChannel() {
         val channelId = _uiState.value.channel?.id ?: return
+        audioRecorder.stopRecording()
+        audioPlayer.stopPlayback()
         webSocketClient.leaveChannel(channelId)
-        webRTCManager.disconnectAll()
         _uiState.value = TalkUiState()
     }
 
@@ -162,14 +111,14 @@ class ChannelViewModel(
         val channelId = _uiState.value.channel?.id ?: return
         _uiState.value = _uiState.value.copy(isTransmitting = true)
         webSocketClient.startTalking(channelId)
-        webRTCManager.setAudioEnabled(true)
+        audioRecorder.startRecording()
     }
 
     fun stopTransmitting() {
         val channelId = _uiState.value.channel?.id ?: return
         _uiState.value = _uiState.value.copy(isTransmitting = false)
         webSocketClient.stopTalking(channelId)
-        webRTCManager.setAudioEnabled(false)
+        audioRecorder.stopRecording()
     }
 
     fun toggleTransmitting() {
@@ -177,24 +126,28 @@ class ChannelViewModel(
         if (currentState.isToggleMode) {
             // Toggle ausschalten
             _uiState.value = currentState.copy(isToggleMode = false, isTransmitting = false)
-            webRTCManager.setAudioEnabled(false)
+            audioRecorder.stopRecording()
             val channelId = _uiState.value.channel?.id ?: return
             webSocketClient.stopTalking(channelId)
         } else {
             // Toggle einschalten
             _uiState.value = currentState.copy(isToggleMode = true, isTransmitting = true)
-            webRTCManager.setAudioEnabled(true)
+            audioRecorder.startRecording()
             val channelId = _uiState.value.channel?.id ?: return
             webSocketClient.startTalking(channelId)
         }
     }
 
-    private fun isPeerConnected(peerId: String): Boolean {
-        return false // Vereinfacht: Prüfung ob PeerConnection existiert
+    fun toggleSpeaker() {
+        val currentState = _uiState.value
+        val newSpeakerState = !currentState.isSpeakerOn
+        _uiState.value = currentState.copy(isSpeakerOn = newSpeakerState)
+        Log.d(TAG, "🔊 toggleSpeaker: ${if (newSpeakerState) "ON" else "OFF"}")
     }
 
     override fun onCleared() {
         super.onCleared()
-        webRTCManager.disconnectAll()
+        audioRecorder.stopRecording()
+        audioPlayer.stopPlayback()
     }
 }
