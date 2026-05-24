@@ -1,5 +1,7 @@
 package com.ronin.walkie.model
 
+import java.io.Serializable
+
 data class Channel(
     val id: Int = 0,
     val name: String = "",
@@ -9,4 +11,4 @@ data class Channel(
     val created_at: String = "",
     val is_active: Boolean = true,
     val member_count: Int = 0
-)
+) : Serializable
