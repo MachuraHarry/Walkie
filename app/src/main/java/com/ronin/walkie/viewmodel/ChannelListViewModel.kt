@@ -65,9 +65,10 @@ class ChannelListViewModel(
                 )
             }
             "channel_created" -> {
-                Log.d(TAG, "📢 Channel created, reloading channels")
-                // Channel-Liste neu laden
-                loadChannels()
+                // Fallback: Server sendet manchmal channel_created (alte Version)
+                // In dem Fall einfach die Channel-Liste neu laden
+                Log.d(TAG, "📢 Received channel_created, reloading channels")
+                forceLoadChannels()
             }
             "error" -> {
                 val errorMsg = message.payload?.get("message") as? String ?: "Ein Fehler ist aufgetreten"
@@ -81,6 +82,15 @@ class ChannelListViewModel(
                 Log.d(TAG, "ℹ️ Unhandled message type: '${message.type}'")
             }
         }
+    }
+
+    /**
+     * Lädt die Channel-Liste ohne isLoading-Sperre.
+     * Wird für Broadcast-Nachrichten verwendet, die von außen kommen.
+     */
+    private fun forceLoadChannels() {
+        Log.d(TAG, "📋 forceLoadChannels() called")
+        webSocketClient.getChannels()
     }
 
     fun loadChannels() {

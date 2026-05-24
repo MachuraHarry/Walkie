@@ -305,13 +305,13 @@ function handleCreateChannel(ws: WebSocket, payload: { name: string; description
   debugLog('CREATE', `✅ Channel #${id} "${name}" created by "${info.username}"`);
   debugLog('CREATE', `Total channels: ${channels.size}`);
 
-  // Allen verbundenen Clients Bescheid geben, damit alle die Channel-Liste aktualisieren
-  const channelPayload = { channel: { id, name, description, color, created_by: info.username, created_at: channel.createdAt.toISOString(), is_active: true, member_count: 1 } };
-  debugLog('CREATE', `Broadcasting channel_created to all ${clients.size} clients`);
+  // Allen verbundenen Clients die aktualisierte Channel-Liste senden
+  const channelList = getChannelList();
+  debugLog('CREATE', `Broadcasting updated channel_list to all ${clients.size} clients (${channelList.length} channels)`);
   for (const [clientWs] of clients) {
     sendToClient(clientWs, {
-      type: 'channel_created',
-      payload: channelPayload
+      type: 'channel_list',
+      payload: { channels: channelList }
     });
   }
 }
