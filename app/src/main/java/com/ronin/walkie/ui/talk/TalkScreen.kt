@@ -677,12 +677,15 @@ fun PTTButton(
                                     dragOffsetPx = offsetY.coerceAtLeast(0f)
 
                                     if (offsetY >= lockThresholdPx) {
+                                        hasLocked = true
+                                        isFingerDown = false
                                         dragOffsetPx = 0f
                                         onToggleTransmitting()
                                         change.consume()
                                         break
                                     }
                                 }
+
 
                                 change.consume()
                             }
