@@ -255,11 +255,8 @@ function handleDisconnect(ws: WebSocket): void {
           type: 'user_left',
           payload: { username: info.username, channelId: info.channelId, users: getMembersInChannel(info.channelId) }
         }, ws);
-        // Channel löschen wenn leer
-        if (channel.members.size === 0) {
-          channels.delete(info.channelId);
-          debugLog('DISCONNECT', `🗑️ Channel #${info.channelId} deleted (empty)`);
-        }
+        // Channel nicht löschen, damit Benutzer später wieder beitreten können
+        debugLog('DISCONNECT', `Channel #${info.channelId} now has ${channel.members.size} members`);
       } else {
         debugLog('DISCONNECT', `Channel #${info.channelId} not found for user "${info.username}"`);
       }
@@ -406,10 +403,8 @@ function handleLeaveChannel(ws: WebSocket, payload: { channelId: number }): void
       payload: { username: info.username, channelId: payload.channelId, users: getMembersInChannel(payload.channelId) }
     });
 
-    if (channel.members.size === 0) {
-      channels.delete(payload.channelId);
-      debugLog('LEAVE', `🗑️ Channel #${payload.channelId} deleted (empty)`);
-    }
+    // Channel nicht löschen, damit Benutzer später wieder beitreten können
+    debugLog('LEAVE', `Channel #${payload.channelId} now has ${channel.members.size} members`);
   }
 
   info.channelId = null;

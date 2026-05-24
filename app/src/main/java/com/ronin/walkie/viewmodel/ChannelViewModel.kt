@@ -195,7 +195,16 @@ class ChannelViewModel(
 
     fun joinChannel(channel: Channel) {
         Log.d(TAG, "🚪 joinChannel: #${channel.id} '${channel.name}'")
-        _uiState.value = _uiState.value.copy(channel = channel)
+        Log.d(TAG, "   webSocketClient.isConnected=${webSocketClient.isConnected}")
+
+        // Verbindungsstatus vom WebSocket übernehmen (der ist noch verbunden)
+        val isConnected = webSocketClient.isConnected
+        _uiState.value = _uiState.value.copy(
+            channel = channel,
+            isConnected = isConnected,
+            connectionQuality = if (isConnected) ConnectionQuality.GOOD else ConnectionQuality.UNKNOWN,
+            error = null
+        )
 
         // Channel in SavedState speichern
         savedStateHandle["saved_channel_id"] = channel.id
