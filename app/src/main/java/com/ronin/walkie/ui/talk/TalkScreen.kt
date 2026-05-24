@@ -441,7 +441,7 @@ fun PTTButton(
             modifier = Modifier
                 .size(180.dp)
                 .scale(if (isTransmitting) pulseScale else 1f)
-                .pointerInput(Unit) {
+                .pointerInput(isToggleMode) {
                     detectTapGestures(
                         onPress = {
                             if (!isToggleMode) {

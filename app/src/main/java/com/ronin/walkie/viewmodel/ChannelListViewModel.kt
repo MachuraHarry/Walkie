@@ -1,6 +1,7 @@
 package com.ronin.walkie.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
@@ -25,54 +26,80 @@ class ChannelListViewModel(
     private val webSocketClient: WalkieWebSocketClient
 ) : AndroidViewModel(application) {
 
+    companion object {
+        private const val TAG = "ChannelListVM"
+    }
+
     private val gson = Gson()
     private val _uiState = MutableStateFlow(ChannelListUiState())
     val uiState: StateFlow<ChannelListUiState> = _uiState.asStateFlow()
 
     init {
+        Log.d(TAG, "🏗️ ChannelListViewModel created")
         observeMessages()
     }
 
     private fun observeMessages() {
+        Log.d(TAG, "👂 Starting to observe WebSocket messages")
         viewModelScope.launch {
             webSocketClient.messages.collect { message ->
+                Log.d(TAG, "📨 ChannelListViewModel received message: type='${message.type}'")
                 handleMessage(message)
             }
         }
     }
 
     private fun handleMessage(message: ServerMessage) {
+        Log.d(TAG, "⚙️ handleMessage: type='${message.type}', payload=${message.payload}")
         when (message.type) {
             "channel_list" -> {
+                Log.d(TAG, "📋 Received channel_list")
                 val channelsJson = gson.toJson(message.payload?.get("channels"))
+                Log.d(TAG, "   channels JSON: $channelsJson")
                 val type = object : TypeToken<List<Channel>>() {}.type
                 val channels: List<Channel> = gson.fromJson(channelsJson, type)
+                Log.d(TAG, "   Parsed ${channels.size} channels")
                 _uiState.value = _uiState.value.copy(
                     channels = channels,
                     isLoading = false
                 )
             }
             "channel_created" -> {
+                Log.d(TAG, "📢 Channel created, reloading channels")
                 // Channel-Liste neu laden
                 loadChannels()
             }
             "error" -> {
                 val errorMsg = message.payload?.get("message") as? String ?: "Ein Fehler ist aufgetreten"
+                Log.e(TAG, "❌ Error: $errorMsg")
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = errorMsg
                 )
             }
+            else -> {
+                Log.d(TAG, "ℹ️ Unhandled message type: '${message.type}'")
+            }
         }
     }
 
     fun loadChannels() {
+        Log.d(TAG, "📋 loadChannels() called")
+        Log.d(TAG, "   isConnected=${webSocketClient.isConnected}")
+        Log.d(TAG, "   isOpen=${webSocketClient.isOpen}")
+        if (_uiState.value.isLoading) {
+            Log.d(TAG, "   Already loading, skipping")
+            return
+        }
         _uiState.value = _uiState.value.copy(isLoading = true)
+        Log.d(TAG, "   Calling webSocketClient.getChannels()")
         webSocketClient.getChannels()
     }
 
     fun createChannel(name: String, description: String = "", color: String = "#4CAF50") {
+        Log.d(TAG, "📢 createChannel: name='$name'")
         if (name.length < 2) {
+            Log.w(TAG, "   Channel name too short")
             _uiState.value = _uiState.value.copy(
                 error = "Channel-Name muss mindestens 2 Zeichen haben"
             )
@@ -82,10 +109,12 @@ class ChannelListViewModel(
     }
 
     fun joinChannel(channelId: Int) {
+        Log.d(TAG, "🚪 joinChannel($channelId)")
         webSocketClient.joinChannel(channelId)
     }
 
     fun setUsername(username: String) {
+        Log.d(TAG, "👤 setUsername('$username')")
         _uiState.value = _uiState.value.copy(currentUsername = username)
     }
 

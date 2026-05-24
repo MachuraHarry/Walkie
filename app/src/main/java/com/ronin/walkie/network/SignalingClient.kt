@@ -1,54 +1,27 @@
 package com.ronin.walkie.network
 
-import android.util.Log
-import com.ronin.walkie.model.SignalMessage
+/**
+ * SignalingClient wird nicht mehr benötigt.
+ * Die Audio-Übertragung erfolgt jetzt direkt über den WebSocket (Audio Relay).
+ * 
+ * @deprecated Seit v2.0 - Audio wird direkt über WalkieWebSocketClient.sendAudioData() gesendet.
+ */
+@Deprecated("Nicht mehr benötigt - Audio Relay verwendet direkte WebSocket-Kommunikation")
+class SignalingClient(private val webSocketClient: WalkieWebSocketClient) {
 
-class SignalingClient(
-    private val webSocketClient: WalkieWebSocketClient
-) {
-    companion object {
-        private const val TAG = "SignalingClient"
+    data class SignalData(
+        val type: String,
+        val from: String,
+        val to: String,
+        val channelId: Int,
+        val data: Any?
+    )
+
+    fun parseSignal(payload: Map<String, Any>?): SignalData? {
+        return null
     }
 
-    fun sendOffer(offer: Any, to: String, channelId: Int) {
-        webSocketClient.sendSignal(mapOf(
-            "type" to "offer",
-            "to" to to,
-            "channelId" to channelId,
-            "data" to offer
-        ))
-    }
-
-    fun sendAnswer(answer: Any, to: String, channelId: Int) {
-        webSocketClient.sendSignal(mapOf(
-            "type" to "answer",
-            "to" to to,
-            "channelId" to channelId,
-            "data" to answer
-        ))
-    }
-
-    fun sendIceCandidate(candidate: Any, to: String, channelId: Int) {
-        webSocketClient.sendSignal(mapOf(
-            "type" to "ice_candidate",
-            "to" to to,
-            "channelId" to channelId,
-            "data" to candidate
-        ))
-    }
-
-    fun parseSignal(payload: Map<String, Any>): SignalMessage? {
-        return try {
-            SignalMessage(
-                type = payload["type"] as? String ?: return null,
-                from = payload["from"] as? String ?: "",
-                to = payload["to"] as? String ?: "",
-                channelId = (payload["channelId"] as? Double)?.toInt() ?: 0,
-                data = payload["data"]
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "Error parsing signal", e)
-            null
-        }
-    }
+    fun sendOffer(sdp: Map<String, Any>, to: String, channelId: Int) {}
+    fun sendAnswer(sdp: Map<String, Any>, to: String, channelId: Int) {}
+    fun sendIceCandidate(candidate: Map<String, Any>, to: String, channelId: Int) {}
 }

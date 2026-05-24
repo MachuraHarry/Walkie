@@ -1,15 +1,21 @@
 package com.ronin.walkie
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -24,11 +30,43 @@ import com.ronin.walkie.viewmodel.ChannelViewModel
 import com.ronin.walkie.viewmodel.LoginViewModel
 
 class MainActivity : ComponentActivity() {
+
+    companion object {
+        private const val TAG = "MainActivity"
+    }
+
+    private val requiredPermissions = arrayOf(
+        Manifest.permission.RECORD_AUDIO
+    )
+
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val allGranted = permissions.values.all { it }
+        if (!allGranted) {
+            Toast.makeText(
+                this,
+                "Mikrofonberechtigung wird benötigt, um Sprache zu senden.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.d(TAG, "🚀 MainActivity.onCreate()")
         enableEdgeToEdge()
 
+        // Runtime-Berechtigungen anfragen (Android 6+)
+        requestPermissionsIfNeeded()
+
         val app = application as WalkieApplication
+        Log.d(TAG, "   WalkieApplication instance: $app")
+        Log.d(TAG, "   SERVER_URL=${WalkieApplication.SERVER_URL}")
+        Log.d(TAG, "   WebSocket client initialized=true (always initialized in WalkieApplication.onCreate())")
+        
+        // Aktuelle Activity setzen (für AudioRecorder)
+        app.setCurrentActivity(this)
 
         setContent {
             WalkieTheme {
@@ -40,6 +78,20 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        Log.d(TAG, "✅ MainActivity.onCreate() complete")
+    }
+
+    private fun requestPermissionsIfNeeded() {
+        val permissionsToRequest = requiredPermissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }.toTypedArray()
+
+        if (permissionsToRequest.isNotEmpty()) {
+            Log.d(TAG, "📋 Requesting permissions: ${permissionsToRequest.joinToString()}")
+            permissionLauncher.launch(permissionsToRequest)
+        } else {
+            Log.d(TAG, "✅ All permissions already granted")
+        }
     }
 }
 
@@ -48,11 +100,14 @@ fun WalkieNavHost(app: WalkieApplication) {
     val navController = rememberNavController()
     val webSocketClient = app.webSocketClient
 
+    Log.d("MainActivity", "🏗️ WalkieNavHost composable")
+
     // ViewModels
     val loginViewModel: LoginViewModel = viewModel(
         factory = object : androidx.lifecycle.ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                Log.d("MainActivity", "🏗️ Creating LoginViewModel")
                 return LoginViewModel(app, webSocketClient) as T
             }
         }
@@ -62,6 +117,7 @@ fun WalkieNavHost(app: WalkieApplication) {
         factory = object : androidx.lifecycle.ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                Log.d("MainActivity", "🏗️ Creating ChannelListViewModel")
                 return ChannelListViewModel(app, webSocketClient) as T
             }
         }
@@ -74,10 +130,13 @@ fun WalkieNavHost(app: WalkieApplication) {
         exitTransition = { fadeOut(animationSpec = androidx.compose.animation.core.tween(300)) }
     ) {
         composable("login") {
+            Log.d("MainActivity", "📱 Login screen composable")
             val uiState by loginViewModel.uiState.collectAsState()
 
             LaunchedEffect(uiState.isLoggedIn) {
+                Log.d("MainActivity", "LaunchedEffect: isLoggedIn=${uiState.isLoggedIn}")
                 if (uiState.isLoggedIn) {
+                    Log.d("MainActivity", "✅ User logged in, navigating to channels")
                     channelListViewModel.setUsername(uiState.username)
                     navController.navigate("channels") {
                         popUpTo("login") { inclusive = true }
@@ -87,8 +146,15 @@ fun WalkieNavHost(app: WalkieApplication) {
 
             LoginScreen(
                 uiState = uiState,
-                onLogin = { username -> loginViewModel.login(username) },
-                onConnect = { app.connectToServer() },
+                onLogin = { username ->
+                    Log.d("MainActivity", "🔑 onLogin('$username') called")
+                    loginViewModel.login(username)
+                },
+                onConnect = {
+                    Log.d("MainActivity", "🔌 onConnect() called - connecting to server...")
+                    Log.d("MainActivity", "   URL=${WalkieApplication.SERVER_URL}")
+                    app.connectToServer()
+                },
                 onClearError = { loginViewModel.clearError() }
             )
         }
@@ -108,18 +174,25 @@ fun WalkieNavHost(app: WalkieApplication) {
                 ) + fadeOut()
             }
         ) {
+            Log.d("MainActivity", "📱 Channels screen composable")
             val uiState by channelListViewModel.uiState.collectAsState()
 
             ChannelListScreen(
                 uiState = uiState,
                 onChannelSelected = { channel ->
-                    navController.currentBackStackEntry?.savedStateHandle?.set("channel", channel)
+                    Log.d("MainActivity", "📢 Channel selected: ${channel.id} '${channel.name}'")
+                    navController.currentBackStackEntry?.savedStateHandle?.set("channelId", channel.id)
+                    navController.currentBackStackEntry?.savedStateHandle?.set("channelName", channel.name)
                     navController.navigate("talk/${channel.id}")
                 },
                 onCreateChannel = { name, description, color ->
+                    Log.d("MainActivity", "📢 onCreateChannel: name='$name'")
                     channelListViewModel.createChannel(name, description, color)
                 },
-                onRefresh = { channelListViewModel.loadChannels() },
+                onRefresh = {
+                    Log.d("MainActivity", "🔄 onRefresh called")
+                    channelListViewModel.loadChannels()
+                },
                 onClearError = { channelListViewModel.clearError() }
             )
         }
@@ -133,51 +206,64 @@ fun WalkieNavHost(app: WalkieApplication) {
                 scaleOut(animationSpec = androidx.compose.animation.core.tween(300)) + fadeOut()
             }
         ) { backStackEntry ->
-            val channel = navController.previousBackStackEntry
+            Log.d("MainActivity", "📱 Talk screen composable")
+            val channelId = navController.previousBackStackEntry
                 ?.savedStateHandle
-                ?.get<Channel>("channel")
+                ?.get<Int>("channelId") ?: backStackEntry.arguments?.getString("channelId")?.toIntOrNull() ?: 0
+            val channelName = navController.previousBackStackEntry
+                ?.savedStateHandle
+                ?.get<String>("channelName") ?: "Channel $channelId"
 
-            if (channel != null) {
-                val username = loginViewModel.uiState.value.username
-                val signalingClient = app.signalingClient
-                val webRTCManager = remember(username) {
-                    app.createWebRTCManager(username)
-                }
+            val channel = Channel(id = channelId, name = channelName)
+            val loginUiState by loginViewModel.uiState.collectAsState()
+            val username = loginUiState.username
+            Log.d("MainActivity", "   Channel: ${channel.id} '${channel.name}', user: '$username'")
 
-                val channelViewModel: ChannelViewModel = viewModel(
-                    key = "channel_${channel.id}",
-                    factory = object : androidx.lifecycle.ViewModelProvider.Factory {
-                        @Suppress("UNCHECKED_CAST")
-                        override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-                            return ChannelViewModel(
-                                app,
-                                webSocketClient,
-                                signalingClient,
-                                webRTCManager,
-                                username
-                            ) as T
-                        }
+            val channelViewModel: ChannelViewModel = viewModel(
+                key = "channel_$channelId",
+                factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+                    @Suppress("UNCHECKED_CAST")
+                    override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                        Log.d("MainActivity", "🏗️ Creating ChannelViewModel for channel $channelId")
+                        return ChannelViewModel(
+                            app,
+                            webSocketClient,
+                            app.audioRecorder,
+                            app.audioPlayer,
+                            username
+                        ) as T
                     }
-                )
-
-                val uiState by channelViewModel.uiState.collectAsState()
-
-                LaunchedEffect(channel) {
-                    channelViewModel.joinChannel(channel)
                 }
+            )
 
-                TalkScreen(
-                    uiState = uiState,
-                    username = username,
-                    onLeaveChannel = {
-                        channelViewModel.leaveChannel()
-                        navController.popBackStack("channels", inclusive = false)
-                    },
-                    onStartTransmitting = { channelViewModel.startTransmitting() },
-                    onStopTransmitting = { channelViewModel.stopTransmitting() },
-                    onToggleTransmitting = { channelViewModel.toggleTransmitting() }
-                )
+            val uiState by channelViewModel.uiState.collectAsState()
+
+            LaunchedEffect(channelId) {
+                Log.d("MainActivity", "LaunchedEffect: joining channel $channelId")
+                channelViewModel.joinChannel(channel)
             }
+
+            TalkScreen(
+                uiState = uiState,
+                username = username,
+                onLeaveChannel = {
+                    Log.d("MainActivity", "🚪 onLeaveChannel called")
+                    channelViewModel.leaveChannel()
+                    navController.popBackStack("channels", inclusive = false)
+                },
+                onStartTransmitting = {
+                    Log.d("MainActivity", "🔴 onStartTransmitting called")
+                    channelViewModel.startTransmitting()
+                },
+                onStopTransmitting = {
+                    Log.d("MainActivity", "🟢 onStopTransmitting called")
+                    channelViewModel.stopTransmitting()
+                },
+                onToggleTransmitting = {
+                    Log.d("MainActivity", "🔄 onToggleTransmitting called")
+                    channelViewModel.toggleTransmitting()
+                }
+            )
         }
     }
 }

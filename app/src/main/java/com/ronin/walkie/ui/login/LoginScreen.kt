@@ -33,9 +33,12 @@ fun LoginScreen(
 ) {
     var username by remember { mutableStateOf("") }
     var isError by remember { mutableStateOf(false) }
+    var hasAttemptedConnection by remember { mutableStateOf(false) }
 
-    LaunchedEffect(uiState.isConnected) {
-        if (!uiState.isConnected) {
+    // Nur einmalig verbinden, nicht bei jeder Änderung von isConnected
+    LaunchedEffect(Unit) {
+        if (!uiState.isConnected && !hasAttemptedConnection) {
+            hasAttemptedConnection = true
             onConnect()
         }
     }

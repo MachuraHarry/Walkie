@@ -49,9 +49,6 @@ dependencies {
     // WebSocket
     implementation("org.java-websocket:Java-WebSocket:1.5.7")
 
-    // WebRTC
-    implementation("io.github.webrtc-sdk:android:125.6422.07")
-
     // JSON
     implementation("com.google.code.gson:gson:2.11.0")
 

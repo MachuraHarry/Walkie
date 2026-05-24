@@ -1,7 +1,7 @@
 {
   "name": "walkie-server",
-  "version": "1.0.0",
-  "description": "Walkie Talkie Server - WebSocket Signaling & Channel Management",
+  "version": "2.0.0",
+  "description": "Walkie Talkie Server v2 - Audio Relay Server (kein WebRTC, keine DB)",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
@@ -9,7 +9,6 @@
     "dev": "ts-node src/index.ts"
   },
   "dependencies": {
-    "pg": "^8.13.0",
     "ws": "^8.18.0",
     "express": "^4.21.0",
     "cors": "^2.8.5"
@@ -17,7 +16,6 @@
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/node": "^20.14.0",
-    "@types/pg": "^8.11.0",
     "@types/ws": "^8.5.10",
     "@types/cors": "^2.8.17",
     "typescript": "^5.5.0",

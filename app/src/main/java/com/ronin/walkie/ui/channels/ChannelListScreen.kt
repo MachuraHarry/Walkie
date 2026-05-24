@@ -32,9 +32,13 @@ fun ChannelListScreen(
     onClearError: () -> Unit
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
+    var hasLoadedChannels by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        onRefresh()
+        if (!hasLoadedChannels) {
+            hasLoadedChannels = true
+            onRefresh()
+        }
     }
 
     if (showCreateDialog) {

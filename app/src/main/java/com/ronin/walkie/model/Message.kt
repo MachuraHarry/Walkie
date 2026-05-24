@@ -10,14 +10,6 @@ data class ServerMessage(
     val payload: Map<String, Any>? = null
 )
 
-data class SignalMessage(
-    val type: String, // "offer" | "answer" | "ice_candidate"
-    val from: String = "",
-    val to: String = "",
-    val channelId: Int = 0,
-    val data: Any? = null
-)
-
 data class TalkingStatus(
     val username: String = "",
     val channelId: Int = 0,
