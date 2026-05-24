@@ -21,7 +21,7 @@ class WalkieApplication : Application() {
             val url = if (isEmulator()) {
                 "ws://10.0.2.2:$SERVER_PORT"
             } else {
-                "wss://$HOST_IP:$SERVER_PORT"
+                "wss://$HOST_IP"
             }
             Log.d(TAG, "🔧 SERVER_URL = $url (isEmulator=${isEmulator()}, fingerprint=${Build.FINGERPRINT}, model=${Build.MODEL}, product=${Build.PRODUCT})")
             url
@@ -30,7 +30,7 @@ class WalkieApplication : Application() {
             val url = if (isEmulator()) {
                 "http://10.0.2.2:$SERVER_PORT"
             } else {
-                "https://$HOST_IP:$SERVER_PORT"
+                "https://$HOST_IP"
             }
             Log.d(TAG, "🔧 HTTP_SERVER_URL = $url")
             url
