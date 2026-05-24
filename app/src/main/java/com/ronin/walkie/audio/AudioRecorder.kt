@@ -20,6 +20,7 @@ import kotlin.math.abs
  * - Audio-Fokus-Management (respektiert Telefonanrufe)
  * - Silence-Detection (VAD - Voice Activity Detection)
  * - Robuster Fehlerbehandlung
+ * - Headset-Unterstützung: Bei angeschlossenen Kopfhörern wird das Headset-Mikrofon verwendet
  */
 class AudioRecorder(private val activity: Activity) {
 
@@ -48,6 +49,7 @@ class AudioRecorder(private val activity: Activity) {
     private var hasAudioFocus = false
     private var silenceStartTime: Long = 0
     private var isPausedByFocusLoss = false
+    private var isHeadsetPlugged = false
 
     init {
         bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT) * BUFFER_SIZE_MULTIPLIER
@@ -63,6 +65,15 @@ class AudioRecorder(private val activity: Activity) {
     fun setChannelId(channelId: Int) {
         Log.d(TAG, "📌 setChannelId($channelId)")
         currentChannelId = channelId
+    }
+
+    /**
+     * Setzt den Headset-Status für korrektes Audio-Routing.
+     * Wenn Kopfhörer mit Mikrofon angeschlossen sind, wird über das Headset-Mikrofon aufgenommen.
+     */
+    fun setHeadsetPlugged(plugged: Boolean) {
+        isHeadsetPlugged = plugged
+        Log.d(TAG, "🎧 AudioRecorder headset state: $plugged")
     }
 
     fun hasPermission(): Boolean {

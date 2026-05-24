@@ -127,6 +127,7 @@ class WalkieApplication : Application() {
         super.onTerminate()
         Log.d(TAG, "💀 WalkieApplication.onTerminate()")
         audioPlayer.stopPlayback()
+        audioPlayer.unregisterHeadsetReceiver()
         soundEffectPlayer.release()
         webSocketClient.cancelReconnect()
         if (webSocketClient.isConnected) {

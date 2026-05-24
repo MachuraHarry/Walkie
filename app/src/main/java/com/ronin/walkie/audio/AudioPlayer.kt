@@ -1,6 +1,9 @@
 package com.ronin.walkie.audio
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioFormat
@@ -20,6 +23,8 @@ import java.util.concurrent.atomic.AtomicBoolean
  * - Audio-Fokus-Management (respektiert Telefonanrufe/Navigation)
  * - Buffer-Overflow-Schutz
  * - Unterstützt mehrere gleichzeitige Sprecher durch Mischen der Audio-Streams
+ * - Automatische Umschaltung zwischen Kopfhörer und Lautsprecher
+ * - Headset-Erkennung: Bei angeschlossenen Kopfhörern wird automatisch über Kopfhörer ausgegeben
  */
 class AudioPlayer {
 
@@ -42,6 +47,12 @@ class AudioPlayer {
     private var audioManager: AudioManager? = null
     private var audioFocusListener: AudioManager.OnAudioFocusChangeListener? = null
     private var hasAudioFocus = false
+    private var isSpeakerOn = true
+    private var context: Context? = null
+
+    // Headset-Erkennung
+    private var isHeadsetPlugged = false
+    private var headsetReceiver: BroadcastReceiver? = null
 
     // Jitter-Buffer: Thread-sichere Queue für eingehende Audio-Daten
     private val jitterBuffer = ConcurrentLinkedQueue<ByteArray>()
@@ -49,7 +60,99 @@ class AudioPlayer {
     private var totalBufferedBytes = 0
 
     fun setAudioManager(context: Context) {
+        this.context = context
         audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        registerHeadsetReceiver(context)
+        // Initialen Headset-Status prüfen
+        checkHeadsetState(context)
+    }
+
+    /**
+     * Prüft den initialen Headset-Status.
+     */
+    private fun checkHeadsetState(context: Context) {
+        val audioManager = audioManager ?: return
+        isHeadsetPlugged = audioManager.isWiredHeadsetOn || audioManager.isBluetoothA2dpOn
+        Log.d(TAG, "🎧 Initial headset state: plugged=$isHeadsetPlugged")
+    }
+
+    /**
+     * Registriert einen Broadcast-Receiver für Headset-Ereignisse.
+     * Reagiert auf:
+     * - ACTION_HEADSET_PLUG: Kabelgebundene Kopfhörer werden ein-/abgesteckt
+     * - ACTION_AUDIO_BECOMING_NOISY: Kopfhörer werden entfernt (zuverlässiger)
+     */
+    private fun registerHeadsetReceiver(context: Context) {
+        try {
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_HEADSET_PLUG)
+                addAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
+                addAction("android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED")
+            }
+
+            headsetReceiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context, intent: Intent) {
+                    when (intent.action) {
+                        Intent.ACTION_HEADSET_PLUG -> {
+                            val state = intent.getIntExtra("state", 0)
+                            val plugged = state == 1
+                            Log.d(TAG, "🎧 Headset plug event: plugged=$plugged")
+                            onHeadsetStateChanged(plugged)
+                        }
+                        AudioManager.ACTION_AUDIO_BECOMING_NOISY -> {
+                            // Kopfhörer wurden entfernt (während der Wiedergabe)
+                            Log.d(TAG, "🎧 Audio becoming noisy (headphones removed)")
+                            onHeadsetStateChanged(false)
+                        }
+                        "android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED" -> {
+                            // Bluetooth-Kopfhörer
+                            val state = intent.getIntExtra("android.bluetooth.profile.extra.STATE", -1)
+                            val connected = state == 2 // STATE_CONNECTED
+                            Log.d(TAG, "🎧 Bluetooth A2DP profile changed: connected=$connected")
+                            onHeadsetStateChanged(connected)
+                        }
+                    }
+                }
+            }
+
+            context.registerReceiver(headsetReceiver, filter)
+            Log.d(TAG, "🎧 Headset receiver registered")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error registering headset receiver", e)
+        }
+    }
+
+    /**
+     * Wird aufgerufen, wenn sich der Headset-Status ändert.
+     * Bei angeschlossenen Kopfhörern: Audio läuft über Kopfhörer (Lautsprecher aus).
+     * Bei abgezogenen Kopfhörern: Zurück zum vorherigen Lautsprecher-Status.
+     */
+    private fun onHeadsetStateChanged(plugged: Boolean) {
+        if (isHeadsetPlugged == plugged) return // Keine Änderung
+
+        isHeadsetPlugged = plugged
+        Log.d(TAG, "🎧 Headset state changed: plugged=$plugged, isSpeakerOn=$isSpeakerOn")
+
+        if (plugged) {
+            // Kopfhörer angeschlossen → Audio läuft automatisch über Kopfhörer
+            // Wir setzen den Modus auf MODE_NORMAL, damit das System automatisch routet
+            audioManager?.mode = AudioManager.MODE_NORMAL
+            // isSpeakerphoneOn muss auf false, damit der Ton NUR über Kopfhörer kommt
+            audioManager?.isSpeakerphoneOn = false
+            Log.d(TAG, "🎧 Headphones detected: routing audio through headphones")
+        } else {
+            // Kopfhörer entfernt → zurück zum eingestellten Lautsprecher-Modus
+            audioManager?.isSpeakerphoneOn = isSpeakerOn
+            audioManager?.mode = if (isSpeakerOn) AudioManager.MODE_NORMAL else AudioManager.MODE_IN_COMMUNICATION
+            Log.d(TAG, "🎧 Headphones removed: restoring speaker mode (isSpeakerOn=$isSpeakerOn)")
+        }
+    }
+
+    /**
+     * Gibt zurück, ob Kopfhörer angeschlossen sind.
+     */
+    fun isHeadsetPlugged(): Boolean {
+        return isHeadsetPlugged
     }
 
     /**
@@ -170,12 +273,32 @@ class AudioPlayer {
             Log.d(TAG, "   AudioTrack playState: ${audioTrack?.playState}")
 
             isPlaying = true
-            Log.d(TAG, "✅ Playback started (${SAMPLE_RATE}Hz, jitter=${JITTER_BUFFER_MS}ms)")
+            // Audio-Routing setzen (Headset hat Vorrang vor Lautsprecher-Einstellung)
+            applyAudioRouting()
+            Log.d(TAG, "✅ Playback started (${SAMPLE_RATE}Hz, jitter=${JITTER_BUFFER_MS}ms, speaker=$isSpeakerOn, headset=$isHeadsetPlugged)")
             return true
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error starting playback", e)
             abandonAudioFocus()
             return false
+        }
+    }
+
+    /**
+     * Wendet das korrekte Audio-Routing an.
+     * - Wenn Kopfhörer angeschlossen sind: Audio läuft über Kopfhörer (Lautsprecher aus)
+     * - Wenn keine Kopfhörer: Verwendet die Benutzer-Einstellung (Lautsprecher an/aus)
+     */
+    private fun applyAudioRouting() {
+        if (isHeadsetPlugged) {
+            // Kopfhörer haben immer Vorrang
+            audioManager?.mode = AudioManager.MODE_NORMAL
+            audioManager?.isSpeakerphoneOn = false
+            Log.d(TAG, "   Audio routing: headphones (speaker forced off)")
+        } else {
+            audioManager?.isSpeakerphoneOn = isSpeakerOn
+            audioManager?.mode = if (isSpeakerOn) AudioManager.MODE_NORMAL else AudioManager.MODE_IN_COMMUNICATION
+            Log.d(TAG, "   Audio routing: speaker=$isSpeakerOn")
         }
     }
 
@@ -317,5 +440,51 @@ class AudioPlayer {
     fun isPlaying(): Boolean {
         Log.d(TAG, "🔍 isPlaying() = $isPlaying")
         return isPlaying
+    }
+
+    /**
+     * Schaltet zwischen Ohrhörer (Earpiece) und Lautsprecher (Speakerphone) um.
+     * Wenn Kopfhörer angeschlossen sind, hat der Kopfhörer Vorrang und der Lautsprecher
+     * wird ausgeschaltet. Die Einstellung wird aber gespeichert, sodass sie nach dem
+     * Abziehen der Kopfhörer wiederhergestellt wird.
+     * @param on true = Lautsprecher an (laut), false = Ohrhörer (leise)
+     */
+    fun setSpeakerphoneOn(on: Boolean) {
+        isSpeakerOn = on
+        Log.d(TAG, "🔊 setSpeakerphoneOn: $on (headset=$isHeadsetPlugged)")
+
+        if (isHeadsetPlugged) {
+            // Kopfhörer sind angeschlossen → Lautsprecher bleibt aus, egal was der Benutzer will
+            audioManager?.isSpeakerphoneOn = false
+            audioManager?.mode = AudioManager.MODE_NORMAL
+            Log.d(TAG, "   Headset plugged: keeping speaker OFF, audio through headphones")
+        } else {
+            // Keine Kopfhörer → Benutzer-Einstellung anwenden
+            audioManager?.isSpeakerphoneOn = on
+            audioManager?.mode = if (on) AudioManager.MODE_NORMAL else AudioManager.MODE_IN_COMMUNICATION
+            Log.d(TAG, "   AudioManager mode=${audioManager?.mode}, speakerphoneOn=${audioManager?.isSpeakerphoneOn}")
+        }
+    }
+
+    /**
+     * Gibt zurück, ob der Lautsprecher eingeschaltet ist.
+     */
+    fun isSpeakerOn(): Boolean {
+        return isSpeakerOn
+    }
+
+    /**
+     * Gibt den Headset-Receiver frei.
+     */
+    fun unregisterHeadsetReceiver() {
+        try {
+            headsetReceiver?.let { receiver ->
+                context?.unregisterReceiver(receiver)
+                headsetReceiver = null
+                Log.d(TAG, "🎧 Headset receiver unregistered")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error unregistering headset receiver", e)
+        }
     }
 }

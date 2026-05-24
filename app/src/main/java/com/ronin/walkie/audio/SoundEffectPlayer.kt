@@ -2,6 +2,7 @@ package com.ronin.walkie.audio
 
 import android.content.Context
 import android.media.AudioAttributes
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.Handler
 import android.os.Looper
@@ -14,6 +15,7 @@ import com.ronin.walkie.R
  * - off.mp3: Wird abgespielt, wenn jemand aufhört zu senden (bei Sender + allen Zuhörern)
  *
  * Verwendet MediaPlayer.create() für zuverlässige Ressourcen-Verwaltung.
+ * Respektiert die Lautsprecher-/Kopfhörer-Einstellung des AudioPlayers.
  */
 class SoundEffectPlayer {
 
@@ -23,9 +25,29 @@ class SoundEffectPlayer {
 
     private var mediaPlayer: MediaPlayer? = null
     private var context: Context? = null
+    private var audioManager: AudioManager? = null
+    private var isSpeakerOn = true
+    private var isHeadsetPlugged = false
 
     fun setContext(context: Context) {
         this.context = context
+        audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+    }
+
+    /**
+     * Aktualisiert die Lautsprecher-Einstellung, damit Soundeffekte
+     * über die richtige Audio-Quelle abgespielt werden.
+     */
+    fun setSpeakerphoneOn(on: Boolean) {
+        isSpeakerOn = on
+    }
+
+    /**
+     * Aktualisiert den Headset-Status, damit Soundeffekte
+     * über die richtige Audio-Quelle abgespielt werden.
+     */
+    fun setHeadsetPlugged(plugged: Boolean) {
+        isHeadsetPlugged = plugged
     }
 
     /**
@@ -48,6 +70,7 @@ class SoundEffectPlayer {
      * Spielt eine Sound-Ressource ab.
      * Nutzt MediaPlayer.create() für zuverlässige Initialisierung.
      * Stoppt vorherige Sounds, damit sie sich nicht überlagern.
+     * Respektiert die Lautsprecher-/Kopfhörer-Einstellung.
      */
     private fun playSound(resId: Int) {
         try {
@@ -80,6 +103,19 @@ class SoundEffectPlayer {
 
                     mediaPlayer = mp
 
+                    // Audio-Routing anwenden: Wenn Kopfhörer angeschlossen sind,
+                    // läuft der Sound über Kopfhörer, sonst über die Lautsprecher-Einstellung
+                    audioManager?.let { am ->
+                        if (isHeadsetPlugged) {
+                            // Kopfhörer haben Vorrang
+                            am.mode = AudioManager.MODE_NORMAL
+                            am.isSpeakerphoneOn = false
+                        } else {
+                            am.isSpeakerphoneOn = isSpeakerOn
+                            am.mode = if (isSpeakerOn) AudioManager.MODE_NORMAL else AudioManager.MODE_IN_COMMUNICATION
+                        }
+                    }
+
                     mp.setOnCompletionListener { player ->
                         Log.d(TAG, "✅ Sound playback completed")
                         player.release()
@@ -98,7 +134,7 @@ class SoundEffectPlayer {
                     }
 
                     mp.start()
-                    Log.d(TAG, "▶️ Sound started playing")
+                    Log.d(TAG, "▶️ Sound started playing (speaker=$isSpeakerOn, headset=$isHeadsetPlugged)")
                 } catch (e: Exception) {
                     Log.e(TAG, "❌ Error playing sound", e)
                     releaseMediaPlayer()

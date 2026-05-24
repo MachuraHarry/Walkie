@@ -157,6 +157,23 @@ fun TalkScreen(
 
                         Spacer(modifier = Modifier.width(16.dp))
 
+                        // Kopfhörer-Status
+                        if (uiState.isHeadsetPlugged) {
+                            Icon(
+                                Icons.Default.Headphones,
+                                contentDescription = "Kopfhörer",
+                                modifier = Modifier.size(16.dp),
+                                tint = Color(0xFF2196F3)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                "Kopfhörer",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF2196F3)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                        }
+
                         // Lautsprecher-Status in der Bottom-Bar
                         Icon(
                             if (uiState.isSpeakerOn) Icons.Default.VolumeUp else Icons.Default.VolumeOff,

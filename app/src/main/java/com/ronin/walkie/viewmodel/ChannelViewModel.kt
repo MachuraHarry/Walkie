@@ -24,6 +24,7 @@ data class TalkUiState(
     val isToggleMode: Boolean = false,
     val isConnected: Boolean = false,
     val isSpeakerOn: Boolean = true,
+    val isHeadsetPlugged: Boolean = false,
     val ping: Long = 0,
     val error: String? = null,
     val isReconnecting: Boolean = false,
@@ -214,6 +215,16 @@ class ChannelViewModel(
         audioPlayer.connectToWebSocket(webSocketClient)
         audioPlayer.startPlayback()
         webSocketClient.joinChannel(channel.id)
+
+        // SoundEffectPlayer und AudioRecorder mit aktuellem Audio-Routing synchronisieren
+        soundEffectPlayer.setSpeakerphoneOn(audioPlayer.isSpeakerOn())
+        val headsetPlugged = audioPlayer.isHeadsetPlugged()
+        soundEffectPlayer.setHeadsetPlugged(headsetPlugged)
+        audioRecorder.setHeadsetPlugged(headsetPlugged)
+        _uiState.value = _uiState.value.copy(
+            isSpeakerOn = audioPlayer.isSpeakerOn(),
+            isHeadsetPlugged = headsetPlugged
+        )
     }
 
     fun leaveChannel() {
@@ -283,7 +294,16 @@ class ChannelViewModel(
         val currentState = _uiState.value
         val newSpeakerState = !currentState.isSpeakerOn
         _uiState.value = currentState.copy(isSpeakerOn = newSpeakerState)
-        Log.d(TAG, "🔊 toggleSpeaker: ${if (newSpeakerState) "ON" else "OFF"}")
+        // Tatsächlich den Audio-Ausgang umschalten (Ohrhörer <-> Lautsprecher)
+        audioPlayer.setSpeakerphoneOn(newSpeakerState)
+        // SoundEffectPlayer同步更新
+        soundEffectPlayer.setSpeakerphoneOn(newSpeakerState)
+        // Headset-Status同步 (für alle Audio-Komponenten)
+        val headsetPlugged = audioPlayer.isHeadsetPlugged()
+        soundEffectPlayer.setHeadsetPlugged(headsetPlugged)
+        audioRecorder.setHeadsetPlugged(headsetPlugged)
+        _uiState.value = _uiState.value.copy(isHeadsetPlugged = headsetPlugged)
+        Log.d(TAG, "🔊 toggleSpeaker: ${if (newSpeakerState) "ON" else "OFF"}, headset=$headsetPlugged")
     }
 
     fun clearError() {
