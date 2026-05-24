@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ronin.walkie.viewmodel.ConnectionQuality
 import com.ronin.walkie.viewmodel.TalkUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -104,58 +105,76 @@ fun TalkScreen(
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 tonalElevation = 2.dp
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Verbindungsstatus
-                    val connectionColor = if (uiState.isConnected) Color(0xFF4CAF50) else Color(0xFFF44336)
-                    val connectionText = if (uiState.isConnected) "Verbunden" else "Getrennt"
-                    
-                    Box(
+                Column {
+                    // Verbindungsqualität
+                    ConnectionQualityBar(uiState.connectionQuality)
+
+                    Row(
                         modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(connectionColor)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        connectionText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    
-                    Spacer(modifier = Modifier.weight(1f))
-                    
-                    if (uiState.isConnected) {
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Verbindungsstatus
+                        val connectionColor = when (uiState.connectionQuality) {
+                            ConnectionQuality.GOOD -> Color(0xFF4CAF50)
+                            ConnectionQuality.FAIR -> Color(0xFFFFC107)
+                            ConnectionQuality.POOR -> Color(0xFFFF5722)
+                            ConnectionQuality.DISCONNECTED -> Color(0xFFF44336)
+                            ConnectionQuality.UNKNOWN -> Color(0xFF9E9E9E)
+                        }
+                        val connectionText = when {
+                            uiState.isReconnecting -> "Wiederverbinde..."
+                            uiState.connectionQuality == ConnectionQuality.DISCONNECTED -> "Getrennt"
+                            uiState.connectionQuality == ConnectionQuality.POOR -> "Schlecht"
+                            uiState.connectionQuality == ConnectionQuality.FAIR -> "Mittel"
+                            uiState.connectionQuality == ConnectionQuality.GOOD -> "Verbunden"
+                            else -> "Unbekannt"
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(connectionColor)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "Ping: ${uiState.ping}ms",
+                            connectionText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.weight(1f))
+
+                        if (uiState.isConnected) {
+                            Text(
+                                "Ping: ${uiState.ping}ms",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        // Lautsprecher-Status in der Bottom-Bar
+                        Icon(
+                            if (uiState.isSpeakerOn) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                            contentDescription = "Lautsprecher",
+                            modifier = Modifier.size(16.dp),
+                            tint = if (uiState.isSpeakerOn) {
+                                Color(0xFF4CAF50)
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            if (uiState.isSpeakerOn) "Lautsprecher an" else "Lautsprecher aus",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    
-                    Spacer(modifier = Modifier.width(16.dp))
-                    
-                    // Lautsprecher-Status in der Bottom-Bar
-                    Icon(
-                        if (uiState.isSpeakerOn) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
-                        contentDescription = "Lautsprecher",
-                        modifier = Modifier.size(16.dp),
-                        tint = if (uiState.isSpeakerOn) {
-                            Color(0xFF4CAF50)
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        if (uiState.isSpeakerOn) "Lautsprecher an" else "Lautsprecher aus",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
             }
         }
@@ -167,6 +186,20 @@ fun TalkScreen(
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Error Snackbar
+            uiState.error?.let { error ->
+                Snackbar(
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    action = {
+                        TextButton(onClick = { /* clearError */ }) {
+                            Text("OK")
+                        }
+                    }
+                ) {
+                    Text(error)
+                }
+            }
+
             // Mitgliederliste
             MemberListSection(
                 users = uiState.users,
@@ -184,6 +217,7 @@ fun TalkScreen(
                 PTTButton(
                     isTransmitting = uiState.isTransmitting,
                     isToggleMode = uiState.isToggleMode,
+                    isConnected = uiState.isConnected,
                     onStartTransmitting = onStartTransmitting,
                     onStopTransmitting = onStopTransmitting,
                     onToggleTransmitting = onToggleTransmitting
@@ -232,6 +266,42 @@ fun TalkScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+}
+
+/**
+ * Zeigt die Verbindungsqualität als farbigen Balken an.
+ */
+@Composable
+fun ConnectionQualityBar(quality: ConnectionQuality) {
+    val color = when (quality) {
+        ConnectionQuality.GOOD -> Color(0xFF4CAF50)
+        ConnectionQuality.FAIR -> Color(0xFFFFC107)
+        ConnectionQuality.POOR -> Color(0xFFFF5722)
+        ConnectionQuality.DISCONNECTED -> Color(0xFFF44336)
+        ConnectionQuality.UNKNOWN -> Color(0xFF9E9E9E)
+    }
+
+    val widthFraction = when (quality) {
+        ConnectionQuality.GOOD -> 1f
+        ConnectionQuality.FAIR -> 0.6f
+        ConnectionQuality.POOR -> 0.3f
+        ConnectionQuality.DISCONNECTED -> 0f
+        ConnectionQuality.UNKNOWN -> 0.5f
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(3.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(widthFraction)
+                .background(color)
+        )
     }
 }
 
@@ -389,12 +459,13 @@ fun MemberItem(
 fun PTTButton(
     isTransmitting: Boolean,
     isToggleMode: Boolean,
+    isConnected: Boolean,
     onStartTransmitting: () -> Unit,
     onStopTransmitting: () -> Unit,
     onToggleTransmitting: () -> Unit
 ) {
     // Lokaler Drag-Offset in Pixeln (wie weit wurde der Button nach oben/unten gezogen)
-    var dragOffsetPx by remember { mutableFloatStateOf(0f) }
+    var dragOffsetPx by remember { mutableStateOf(0f) }
     // Ob der Finger gerade auf dem Button ist
     var isFingerDown by remember { mutableStateOf(false) }
 
@@ -404,7 +475,7 @@ fun PTTButton(
 
     // Animationen
     val infiniteTransition = rememberInfiniteTransition(label = "ptt")
-    
+
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
         targetValue = if (isTransmitting || isToggleMode) 1.08f else 1f,
@@ -452,17 +523,20 @@ fun PTTButton(
     }
 
     val buttonColor = when {
+        !isConnected -> Color(0xFF9E9E9E) // Grau wenn nicht verbunden
         isToggleMode -> Color(0xFFFF5722) // Orange für eingerastet
         isTransmitting -> Color(0xFFF44336) // Rot für Push-to-Talk
         else -> MaterialTheme.colorScheme.surfaceVariant // Grau für idle
     }
 
     val buttonIcon = when {
+        !isConnected -> Icons.Default.WifiOff
         isToggleMode -> Icons.Default.Lock
         else -> Icons.Default.Mic
     }
 
     val buttonText = when {
+        !isConnected -> "KEINE VERBINDUNG"
         isToggleMode -> "DAUER-SENDEN"
         isTransmitting -> "SENDET"
         else -> "HALTEN & SPRECHEN"
@@ -514,7 +588,7 @@ fun PTTButton(
                 .offset(y = animatedDragOffset.dp)
                 .size(180.dp)
                 .scale(if (isTransmitting || isToggleMode) pulseScale else 1f)
-                .pointerInput(isToggleMode) {
+                .pointerInput(isConnected, isToggleMode) {
                     // Endlosschleife: nach jeder Geste neu starten
                     while (true) {
                         // Niedrige Pointer-Ebene für sofortige Press-Reaktion
@@ -523,32 +597,32 @@ fun PTTButton(
                             val down = awaitPointerEvent()
                             val downChange = down.changes.firstOrNull() ?: return@awaitPointerEventScope
                             downChange.consume()
-                            
+
                             val downY = downChange.position.y
-                            
-                            if (!isToggleMode) {
+
+                            if (!isToggleMode && isConnected) {
                                 // ✅ Finger runter → SOFORT senden starten
                                 isFingerDown = true
                                 dragOffsetPx = 0f
                                 onStartTransmitting()
                             }
-                            
+
                             var hasLocked = false
-                            
+
                             // Verarbeite Bewegungen während Finger unten ist
                             while (true) {
                                 val event = awaitPointerEvent()
                                 val change = event.changes.firstOrNull() ?: break
-                                
+
                                 if (!change.pressed) break // Finger losgelassen
-                                
+
                                 val currentY = change.position.y
                                 val offsetY = currentY - downY
-                                
-                                if (!isToggleMode && !hasLocked) {
+
+                                if (!isToggleMode && !hasLocked && isConnected) {
                                     // Drag nach oben verfolgen (negativ = nach oben)
                                     dragOffsetPx = offsetY.coerceAtMost(0f)
-                                    
+
                                     // Prüfe auf Einrasten
                                     if (offsetY <= -lockThresholdPx) {
                                         hasLocked = true
@@ -562,7 +636,7 @@ fun PTTButton(
                                 } else if (isToggleMode) {
                                     // Im eingerasteten Modus: nach unten ziehen zum Lösen
                                     dragOffsetPx = offsetY.coerceAtLeast(0f)
-                                    
+
                                     if (offsetY >= lockThresholdPx) {
                                         dragOffsetPx = 0f
                                         onToggleTransmitting()
@@ -570,12 +644,12 @@ fun PTTButton(
                                         break
                                     }
                                 }
-                                
+
                                 change.consume()
                             }
-                            
+
                             // Finger losgelassen ohne Einrasten
-                            if (!isToggleMode && !hasLocked) {
+                            if (!isToggleMode && !hasLocked && isConnected) {
                                 isFingerDown = false
                                 dragOffsetPx = 0f
                                 onStopTransmitting()

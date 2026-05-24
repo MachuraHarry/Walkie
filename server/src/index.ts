@@ -35,6 +35,8 @@ interface ClientInfo {
   ws: WebSocket;
   username: string;
   channelId: number | null;
+  lastPong: number;
+  connectedAt: Date;
 }
 
 let nextChannelId = 1;
@@ -49,7 +51,11 @@ function sendToClient(ws: WebSocket, message: any): void {
   const json = JSON.stringify(message);
   debugLog('SEND', `-> Client: ${json.substring(0, 200)}`);
   if (ws.readyState === WebSocket.OPEN) {
-    ws.send(json);
+    try {
+      ws.send(json);
+    } catch (error) {
+      debugLog('SEND', `!! Error sending to client: ${error}`);
+    }
   } else {
     debugLog('SEND', `!! Client not OPEN (state=${ws.readyState}), cannot send: ${json.substring(0, 100)}`);
   }
@@ -109,6 +115,7 @@ app.get('/health', (_req, res) => {
     timestamp: new Date().toISOString(),
     channels: channels.size,
     clients: clients.size,
+    uptime: process.uptime(),
   });
 });
 
@@ -117,12 +124,20 @@ app.get('/health', (_req, res) => {
 // ============================================================
 
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ 
+  server,
+  // WebSocket-Optionen für bessere Stabilität
+  maxPayload: 1024 * 1024, // 1MB max payload
+  clientTracking: true,
+});
 
 wss.on('connection', (ws, req) => {
   const clientIp = req.socket.remoteAddress;
   debugLog('WS', `🔗 New WebSocket connection from ${clientIp}`);
   debugLog('WS', `Total connections: ${wss.clients.size}`);
+
+  // Sende "connected" Nachricht an den Client
+  sendToClient(ws, { type: 'connected', payload: { timestamp: Date.now() } });
 
   ws.on('message', (rawData) => {
     try {
@@ -148,19 +163,36 @@ wss.on('connection', (ws, req) => {
 
   // Ping/Pong für Verbindungsüberwachung
   ws.on('pong', () => {
+    const info = clients.get(ws);
+    if (info) {
+      info.lastPong = Date.now();
+    }
     debugLog('WS', '🏓 Pong received from client');
   });
 });
 
-// Periodischer Ping an alle Clients
+// Periodischer Ping an alle Clients (alle 10s statt 30s für schnellere Erkennung)
 setInterval(() => {
+  const now = Date.now();
   debugLog('WS', `🏓 Pinging ${wss.clients.size} clients...`);
+  
   wss.clients.forEach((ws) => {
     if (ws.readyState === WebSocket.OPEN) {
-      ws.ping();
+      try {
+        ws.ping();
+        
+        // Prüfe ob Client noch lebt (kein Pong seit 30s)
+        const info = clients.get(ws);
+        if (info && (now - info.lastPong) > 30000) {
+          debugLog('WS', `💀 Client "${info.username}" timed out (no pong for ${(now - info.lastPong) / 1000}s), terminating`);
+          ws.terminate();
+        }
+      } catch (error) {
+        debugLog('WS', `!! Error pinging client: ${error}`);
+      }
     }
   });
-}, 30000);
+}, 10000);
 
 // ============================================================
 // Message Handler
@@ -197,6 +229,10 @@ function handleMessage(ws: WebSocket, message: { type: string; payload?: any }):
       break;
     case 'audio_data':
       handleAudioData(ws, payload);
+      break;
+    case 'ping':
+      // Client-seitiger Ping - sofort mit Pong antworten
+      sendToClient(ws, { type: 'pong', payload: { timestamp: Date.now() } });
       break;
     default:
       debugLog('HANDLE', `⚠️ Unknown message type: "${type}"`);
@@ -254,7 +290,7 @@ function handleLogin(ws: WebSocket, payload: { username: string }): void {
     }
   }
 
-  clients.set(ws, { ws, username, channelId: null });
+  clients.set(ws, { ws, username, channelId: null, lastPong: Date.now(), connectedAt: new Date() });
   debugLog('LOGIN', `✅ User logged in: ${username} (Total: ${clients.size})`);
   
   const response = { type: 'login_success', payload: { user: { id: 0, username, joined_at: new Date().toISOString(), last_active: new Date().toISOString() } } };
@@ -460,11 +496,12 @@ function handleAudioData(ws: WebSocket, payload: { channelId: number; data: stri
 server.listen(config.port, '0.0.0.0', () => {
   console.log(`
 ╔══════════════════════════════════════════╗
-║        Walkie Talkie Server v2           ║
+║        Walkie Talkie Server v2.1         ║
 ║──────────────────────────────────────────║
 ║  WebSocket: ws://0.0.0.0:${config.port}         ║
 ║  Health:    http://0.0.0.0:${config.port}/health ║
 ║  Mode:      Audio Relay (kein WebRTC)    ║
+║  Ping:      10s interval, 30s timeout    ║
 ║  DEBUG:     ENABLED                      ║
 ╚══════════════════════════════════════════╝
   `);

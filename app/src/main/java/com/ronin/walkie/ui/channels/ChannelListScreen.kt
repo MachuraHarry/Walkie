@@ -26,20 +26,13 @@ import com.ronin.walkie.viewmodel.ChannelListUiState
 @Composable
 fun ChannelListScreen(
     uiState: ChannelListUiState,
-    onChannelSelected: (Channel) -> Unit,
+    username: String,
+    onChannelClick: (Channel) -> Unit,
     onCreateChannel: (String, String, String) -> Unit,
     onRefresh: () -> Unit,
     onClearError: () -> Unit
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
-    var hasLoadedChannels by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        if (!hasLoadedChannels) {
-            hasLoadedChannels = true
-            onRefresh()
-        }
-    }
 
     if (showCreateDialog) {
         CreateChannelDialog(
@@ -59,134 +52,183 @@ fun ChannelListScreen(
                         Icon(
                             Icons.Default.Radio,
                             contentDescription = null,
-                            modifier = Modifier.size(24.dp),
+                            modifier = Modifier.size(20.dp),
                             tint = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            "Walkie Talkie",
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text("Channels", fontWeight = FontWeight.Bold)
                     }
                 },
                 actions = {
-                    if (uiState.currentUsername.isNotEmpty()) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(end = 8.dp)
-                        ) {
-                            Text(
-                                uiState.currentUsername,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.Person,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                    tint = MaterialTheme.colorScheme.primary
+                    // Verbindungsstatus
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (uiState.isConnected) Color(0xFF4CAF50)
+                                    else if (uiState.isReconnecting) Color(0xFFFFC107)
+                                    else Color(0xFFF44336)
                                 )
-                            }
-                        }
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = when {
+                                uiState.isReconnecting -> "Wiederverbinde..."
+                                uiState.isConnected -> "Verbunden"
+                                else -> "Getrennt"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    IconButton(onClick = onRefresh) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = "Aktualisieren"
+                        )
+                    }
+                    IconButton(onClick = { showCreateDialog = true }) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Channel erstellen"
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             )
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { showCreateDialog = true },
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("Channel erstellen") },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            )
         }
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            if (uiState.isLoading && uiState.channels.isEmpty()) {
-                // Loading
+            // Error-Anzeige
+            uiState.error?.let { error ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = error,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(
+                            onClick = onClearError,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Schließen",
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Willkommenstext
+            Text(
+                text = "Hallo $username!",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+
+            Text(
+                text = "Wähle einen Channel zum Beitreten oder erstelle einen neuen.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (uiState.isLoading) {
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator()
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator()
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "Lade Channels...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             } else if (uiState.channels.isEmpty()) {
-                // Empty state
-                Column(
+                // Leerer Zustand
+                Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.Radio,
-                        contentDescription = null,
-                        modifier = Modifier.size(80.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        "Noch keine Channels vorhanden",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "Erstelle den ersten Channel mit dem Button unten",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.Default.Radio,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "Noch keine Channels vorhanden",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Erstelle einen neuen Channel mit dem + Button",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                        )
+                    }
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = 8.dp,
-                        bottom = 88.dp // Platz für FAB
-                    ),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(uiState.channels) { channel ->
                         ChannelCard(
                             channel = channel,
-                            onClick = { onChannelSelected(channel) }
+                            onClick = { onChannelClick(channel) }
                         )
                     }
-                }
-            }
-
-            // Error Snackbar
-            uiState.error?.let { error ->
-                Snackbar(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(16.dp),
-                    action = {
-                        TextButton(onClick = onClearError) {
-                            Text("OK")
-                        }
-                    }
-                ) {
-                    Text(error)
                 }
             }
         }
@@ -198,12 +240,6 @@ fun ChannelCard(
     channel: Channel,
     onClick: () -> Unit
 ) {
-    val channelColor = try {
-        Color(android.graphics.Color.parseColor(channel.color))
-    } catch (e: Exception) {
-        MaterialTheme.colorScheme.primary
-    }
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -220,50 +256,46 @@ fun ChannelCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Farbindikator
+            // Channel Icon
             Box(
                 modifier = Modifier
-                    .size(12.dp)
+                    .size(56.dp)
                     .clip(CircleShape)
-                    .background(channelColor)
-            )
+                    .background(
+                        try {
+                            Color(android.graphics.Color.parseColor(channel.color))
+                        } catch (e: Exception) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Radio,
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp),
+                    tint = Color.White
+                )
+            }
 
             Spacer(modifier = Modifier.width(16.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    channel.name,
+                    text = channel.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
                 if (channel.description.isNotEmpty()) {
                     Text(
-                        channel.description,
+                        text = channel.description,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
             }
-
-            // Mitgliederanzahl
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.Person,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    "${channel.member_count}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
 
             Icon(
                 Icons.Default.ChevronRight,

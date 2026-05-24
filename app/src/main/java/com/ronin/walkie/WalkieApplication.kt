@@ -73,6 +73,8 @@ class WalkieApplication : Application() {
         instance = this
         initializeWebSocket()
         audioPlayer = AudioPlayer()
+        // AudioManager für Audio-Fokus setzen
+        audioPlayer.setAudioManager(this)
         Log.d(TAG, "✅ WalkieApplication initialized. SERVER_URL=$SERVER_URL")
     }
 
@@ -95,7 +97,7 @@ class WalkieApplication : Application() {
         Log.d(TAG, "   isConnected=${webSocketClient.isConnected}")
         Log.d(TAG, "   isConnecting=${webSocketClient.isConnecting()}")
         Log.d(TAG, "   readyState=${webSocketClient.readyState}")
-        
+
         if (!webSocketClient.isConnected && !webSocketClient.isConnecting()) {
             Log.d(TAG, "   -> Calling webSocketClient.connect()")
             webSocketClient.connect()

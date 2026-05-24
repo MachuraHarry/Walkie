@@ -3,39 +3,55 @@ package com.ronin.walkie.viewmodel
 import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.ronin.walkie.model.Channel
 import com.ronin.walkie.model.ServerMessage
 import com.ronin.walkie.network.WalkieWebSocketClient
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 
 data class ChannelListUiState(
     val channels: List<Channel> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
-    val currentUsername: String = ""
+    val currentUsername: String = "",
+    val isConnected: Boolean = false,
+    val isReconnecting: Boolean = false
 )
 
 class ChannelListViewModel(
     application: Application,
-    private val webSocketClient: WalkieWebSocketClient
+    private val webSocketClient: WalkieWebSocketClient,
+    private val savedStateHandle: SavedStateHandle = SavedStateHandle()
 ) : AndroidViewModel(application) {
 
     companion object {
         private const val TAG = "ChannelListVM"
+        private const val LOAD_TIMEOUT_MS = 10000L
     }
 
     private val gson = Gson()
     private val _uiState = MutableStateFlow(ChannelListUiState())
     val uiState: StateFlow<ChannelListUiState> = _uiState.asStateFlow()
 
+    private var loadTimeoutJob: Job? = null
+
     init {
         Log.d(TAG, "🏗️ ChannelListViewModel created")
+
+        // SavedState wiederherstellen
+        savedStateHandle.get<String>("saved_username")?.let { savedUsername ->
+            if (savedUsername.isNotEmpty()) {
+                _uiState.value = _uiState.value.copy(currentUsername = savedUsername)
+                Log.d(TAG, "   Restored username from SavedStateHandle: '$savedUsername'")
+            }
+        }
+
         observeMessages()
     }
 
@@ -52,8 +68,26 @@ class ChannelListViewModel(
     private fun handleMessage(message: ServerMessage) {
         Log.d(TAG, "⚙️ handleMessage: type='${message.type}', payload=${message.payload}")
         when (message.type) {
+            "connected" -> {
+                Log.d(TAG, "✅ WebSocket connected!")
+                _uiState.value = _uiState.value.copy(
+                    isConnected = true,
+                    isReconnecting = false,
+                    error = null
+                )
+                // Automatisch Channels laden wenn verbunden
+                loadChannels()
+            }
+            "disconnected" -> {
+                Log.d(TAG, "🔌 WebSocket disconnected!")
+                _uiState.value = _uiState.value.copy(
+                    isConnected = false,
+                    isReconnecting = webSocketClient.isConnecting()
+                )
+            }
             "channel_list" -> {
                 Log.d(TAG, "📋 Received channel_list")
+                loadTimeoutJob?.cancel()
                 val channelsJson = gson.toJson(message.payload?.get("channels"))
                 Log.d(TAG, "   channels JSON: $channelsJson")
                 val type = object : TypeToken<List<Channel>>() {}.type
@@ -65,14 +99,13 @@ class ChannelListViewModel(
                 )
             }
             "channel_created" -> {
-                // Fallback: Server sendet manchmal channel_created (alte Version)
-                // In dem Fall einfach die Channel-Liste neu laden
                 Log.d(TAG, "📢 Received channel_created, reloading channels")
                 forceLoadChannels()
             }
             "error" -> {
                 val errorMsg = message.payload?.get("message") as? String ?: "Ein Fehler ist aufgetreten"
                 Log.e(TAG, "❌ Error: $errorMsg")
+                loadTimeoutJob?.cancel()
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = errorMsg
@@ -84,10 +117,6 @@ class ChannelListViewModel(
         }
     }
 
-    /**
-     * Lädt die Channel-Liste ohne isLoading-Sperre.
-     * Wird für Broadcast-Nachrichten verwendet, die von außen kommen.
-     */
     private fun forceLoadChannels() {
         Log.d(TAG, "📋 forceLoadChannels() called")
         webSocketClient.getChannels()
@@ -97,13 +126,36 @@ class ChannelListViewModel(
         Log.d(TAG, "📋 loadChannels() called")
         Log.d(TAG, "   isConnected=${webSocketClient.isConnected}")
         Log.d(TAG, "   isOpen=${webSocketClient.isOpen}")
+
         if (_uiState.value.isLoading) {
             Log.d(TAG, "   Already loading, skipping")
             return
         }
+
+        if (!webSocketClient.isConnected) {
+            Log.w(TAG, "   Not connected, cannot load channels")
+            _uiState.value = _uiState.value.copy(
+                error = "Keine Verbindung zum Server"
+            )
+            return
+        }
+
         _uiState.value = _uiState.value.copy(isLoading = true)
         Log.d(TAG, "   Calling webSocketClient.getChannels()")
         webSocketClient.getChannels()
+
+        // Timeout für Channel-Load
+        loadTimeoutJob?.cancel()
+        loadTimeoutJob = viewModelScope.launch {
+            delay(LOAD_TIMEOUT_MS)
+            if (_uiState.value.isLoading) {
+                Log.w(TAG, "⏰ Channel load timeout after ${LOAD_TIMEOUT_MS}ms")
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = "Timeout beim Laden der Channels. Server antwortet nicht."
+                )
+            }
+        }
     }
 
     fun createChannel(name: String, description: String = "", color: String = "#4CAF50") {
@@ -115,20 +167,43 @@ class ChannelListViewModel(
             )
             return
         }
+
+        if (!webSocketClient.isConnected) {
+            Log.w(TAG, "   Not connected, cannot create channel")
+            _uiState.value = _uiState.value.copy(
+                error = "Keine Verbindung zum Server"
+            )
+            return
+        }
+
         webSocketClient.createChannel(name, description, color)
     }
 
     fun joinChannel(channelId: Int) {
         Log.d(TAG, "🚪 joinChannel($channelId)")
+        if (!webSocketClient.isConnected) {
+            Log.w(TAG, "   Not connected, cannot join channel")
+            _uiState.value = _uiState.value.copy(
+                error = "Keine Verbindung zum Server"
+            )
+            return
+        }
         webSocketClient.joinChannel(channelId)
     }
 
     fun setUsername(username: String) {
         Log.d(TAG, "👤 setUsername('$username')")
         _uiState.value = _uiState.value.copy(currentUsername = username)
+        savedStateHandle["saved_username"] = username
     }
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        Log.d(TAG, "🧹 ChannelListViewModel.onCleared()")
+        loadTimeoutJob?.cancel()
     }
 }
