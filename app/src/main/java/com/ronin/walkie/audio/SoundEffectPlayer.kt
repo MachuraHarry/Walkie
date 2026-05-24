@@ -9,6 +9,7 @@ import android.os.HandlerThread
 import android.os.Looper
 import android.util.Log
 import com.ronin.walkie.R
+import com.ronin.walkie.settings.SettingsManager
 
 /**
  * Spielt kurze Soundeffekte (on.mp3 / off.mp3) ab, wie bei einem echten Walkie-Talkie.
@@ -29,6 +30,7 @@ class SoundEffectPlayer {
     private var audioManager: AudioManager? = null
     private var isSpeakerOn = true
     private var isHeadsetPlugged = false
+    private var settingsManager: SettingsManager? = null
 
     // Hintergrund-Thread für MediaPlayer-Operationen
     private val soundThread = HandlerThread("SoundEffectPlayer")
@@ -42,6 +44,7 @@ class SoundEffectPlayer {
     fun setContext(context: Context) {
         this.context = context
         audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        settingsManager = SettingsManager(context)
     }
 
     /**
@@ -85,6 +88,13 @@ class SoundEffectPlayer {
     private fun playSound(resId: Int) {
         soundHandler.post {
             try {
+                // Prüfen, ob Sound-Effekte aktiviert sind
+                val sm = settingsManager
+                if (sm != null && !sm.isSoundEnabled()) {
+                    Log.d(TAG, "🔇 Sound effects disabled, skipping playback")
+                    return@post
+                }
+
                 // Vorherigen MediaPlayer stoppen und freigeben
                 releaseMediaPlayer()
 

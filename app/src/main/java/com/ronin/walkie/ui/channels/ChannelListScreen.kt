@@ -30,7 +30,8 @@ fun ChannelListScreen(
     onChannelClick: (Channel) -> Unit,
     onCreateChannel: (String, String, String) -> Unit,
     onRefresh: () -> Unit,
-    onClearError: () -> Unit
+    onClearError: () -> Unit,
+    onSettingsClick: () -> Unit = {}
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
 
@@ -91,6 +92,12 @@ fun ChannelListScreen(
                         Icon(
                             Icons.Default.Refresh,
                             contentDescription = "Aktualisieren"
+                        )
+                    }
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = "Einstellungen"
                         )
                     }
                     IconButton(onClick = { showCreateDialog = true }) {

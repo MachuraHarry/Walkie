@@ -28,10 +28,13 @@ import com.ronin.walkie.audio.AudioPlayer
 import com.ronin.walkie.audio.AudioRecorder
 import com.ronin.walkie.model.Channel
 import com.ronin.walkie.network.WalkieWebSocketClient
+import com.ronin.walkie.settings.SettingsManager
 import com.ronin.walkie.ui.channels.ChannelListScreen
 import com.ronin.walkie.ui.login.LoginScreen
+import com.ronin.walkie.ui.settings.SettingsScreen
 import com.ronin.walkie.ui.talk.TalkScreen
 import com.ronin.walkie.ui.theme.WalkieTheme
+import com.ronin.walkie.ui.theme.isDarkThemeFromSettings
 import com.ronin.walkie.viewmodel.*
 
 class MainActivity : ComponentActivity() {
@@ -61,10 +64,16 @@ class MainActivity : ComponentActivity() {
         // Notwendig, damit die Foreground Service Notification angezeigt wird
         requestNotificationPermission()
 
+        // RECORD_AUDIO Permission anfordern (ab Android 16 / targetSDK 36)
+        // Notwendig, damit der Foreground Service mit Typ "microphone" gestartet werden kann
+        requestRecordAudioPermission()
+
         enableEdgeToEdge()
 
         setContent {
-            WalkieTheme {
+            // DarkMode aus den Einstellungen lesen
+            val isDark = isDarkThemeFromSettings(this)
+            WalkieTheme(darkTheme = isDark) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -97,6 +106,27 @@ class MainActivity : ComponentActivity() {
             } else {
                 Log.d(TAG, "✅ POST_NOTIFICATIONS already granted")
             }
+        }
+    }
+
+    /**
+     * Fordert die RECORD_AUDIO-Berechtigung an.
+     * Ab Android 16 (targetSDK 36) wird diese Berechtigung benötigt, um einen
+     * Foreground Service mit dem Typ "microphone" starten zu können.
+     * Ohne diese Berechtigung wirft startForeground() einen SecurityException.
+     */
+    private fun requestRecordAudioPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.d(TAG, "📋 Requesting RECORD_AUDIO permission")
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.RECORD_AUDIO),
+                1003
+            )
+        } else {
+            Log.d(TAG, "✅ RECORD_AUDIO already granted")
         }
     }
 
@@ -146,6 +176,9 @@ fun WalkieApp(
     var currentChannel by remember { mutableStateOf<Channel?>(null) }
     var currentUsername by remember { mutableStateOf("") }
 
+    // SettingsManager (für den Zugriff auf gespeicherte Einstellungen)
+    val settingsManager = remember { SettingsManager(WalkieApplication.instance) }
+
     // ViewModels
     val loginViewModel: LoginViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
@@ -190,6 +223,17 @@ fun WalkieApp(
         }
     )
 
+    val settingsViewModel: SettingsViewModel = viewModel(
+        factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                return SettingsViewModel(
+                    application = WalkieApplication.instance
+                ) as T
+            }
+        }
+    )
+
     // LoginUiState beobachten
     val loginUiState by loginViewModel.uiState.collectAsState()
 
@@ -208,6 +252,9 @@ fun WalkieApp(
     // ChannelViewModel UiState beobachten
     val talkUiState by channelViewModel.uiState.collectAsState()
 
+    // SettingsUiState beobachten
+    val settingsUiState by settingsViewModel.uiState.collectAsState()
+
     // Screen-Übergänge
     AnimatedContent(
         targetState = currentScreen,
@@ -216,6 +263,7 @@ fun WalkieApp(
                 "login" -> slideInHorizontally { -it } + fadeIn() togetherWith slideOutHorizontally { it } + fadeOut()
                 "channels" -> slideInHorizontally { it } + fadeIn() togetherWith slideOutHorizontally { -it } + fadeOut()
                 "talk" -> fadeIn() togetherWith fadeOut()
+                "settings" -> slideInHorizontally { it } + fadeIn() togetherWith slideOutHorizontally { -it } + fadeOut()
                 else -> fadeIn() togetherWith fadeOut()
             }
         },
@@ -244,7 +292,8 @@ fun WalkieApp(
                         channelListViewModel.createChannel(name, description, color)
                     },
                     onRefresh = { channelListViewModel.loadChannels() },
-                    onClearError = { channelListViewModel.clearError() }
+                    onClearError = { channelListViewModel.clearError() },
+                    onSettingsClick = { currentScreen = "settings" }
                 )
             }
 
@@ -270,6 +319,35 @@ fun WalkieApp(
                     onStopTransmitting = { channelViewModel.stopTransmitting() },
                     onToggleTransmitting = { channelViewModel.toggleTransmitting() },
                     onToggleSpeaker = { channelViewModel.toggleSpeaker() }
+                )
+            }
+
+            "settings" -> {
+                SettingsScreen(
+                    uiState = settingsUiState,
+                    onBack = { currentScreen = "channels" },
+                    onStartEditingUsername = { settingsViewModel.startEditingUsername() },
+                    onCancelEditingUsername = { settingsViewModel.cancelEditingUsername() },
+                    onUpdateUsername = { settingsViewModel.updateUsername(it) },
+                    onSaveUsername = { settingsViewModel.saveUsername() },
+                    onToggleSound = { settingsViewModel.toggleSound() },
+                    onSetPttMode = { settingsViewModel.setPttMode(it) },
+                    onSetAudioQuality = { settingsViewModel.setAudioQuality(it) },
+                    onToggleVad = { settingsViewModel.toggleVad() },
+                    onSetVadThreshold = { settingsViewModel.setVadThreshold(it) },
+                    onStartEditingServerUrl = { settingsViewModel.startEditingServerUrl() },
+                    onCancelEditingServerUrl = { settingsViewModel.cancelEditingServerUrl() },
+                    onUpdateServerUrl = { settingsViewModel.updateServerUrl(it) },
+                    onSaveServerUrl = { settingsViewModel.saveServerUrl() },
+                    onSetDarkMode = { settingsViewModel.setDarkMode(it) },
+                    onToggleSpeakerDefault = { settingsViewModel.toggleSpeakerDefault() },
+                    onToggleAudioCompression = { settingsViewModel.toggleAudioCompression() },
+                    onSetPttToggleLockThreshold = { settingsViewModel.setPttToggleLockThreshold(it) },
+                    onShowResetDialog = { settingsViewModel.showResetDialog() },
+                    onHideResetDialog = { settingsViewModel.hideResetDialog() },
+                    onResetAllSettings = { settingsViewModel.resetAllSettings() },
+                    onDismissRestartRequired = { settingsViewModel.dismissRestartRequired() },
+                    onClearSavedMessage = { settingsViewModel.clearSavedMessage() }
                 )
             }
         }

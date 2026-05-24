@@ -14,14 +14,14 @@ class WalkieApplication : Application() {
 
     companion object {
         private const val TAG = "WalkieApp"
-        private const val HOST_IP = "192.168.178.78"
-        private const val SERVER_PORT = 3000
+        private const val HOST_IP = "server-bxmm.onrender.com"
+        private const val SERVER_PORT = 1000
 
         val SERVER_URL: String by lazy {
             val url = if (isEmulator()) {
                 "ws://10.0.2.2:$SERVER_PORT"
             } else {
-                "ws://$HOST_IP:$SERVER_PORT"
+                "wss://$HOST_IP:$SERVER_PORT"
             }
             Log.d(TAG, "🔧 SERVER_URL = $url (isEmulator=${isEmulator()}, fingerprint=${Build.FINGERPRINT}, model=${Build.MODEL}, product=${Build.PRODUCT})")
             url
@@ -30,7 +30,7 @@ class WalkieApplication : Application() {
             val url = if (isEmulator()) {
                 "http://10.0.2.2:$SERVER_PORT"
             } else {
-                "http://$HOST_IP:$SERVER_PORT"
+                "https://$HOST_IP:$SERVER_PORT"
             }
             Log.d(TAG, "🔧 HTTP_SERVER_URL = $url")
             url
@@ -141,6 +141,8 @@ class WalkieApplication : Application() {
                 startService(intent)
             }
             Log.d(TAG, "✅ Foreground service intent sent")
+        } catch (e: SecurityException) {
+            Log.e(TAG, "❌ SecurityException starting foreground service - RECORD_AUDIO permission may not be granted", e)
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error starting foreground service", e)
         }
