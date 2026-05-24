@@ -118,6 +118,10 @@ class ChannelViewModel(
             "disconnected" -> {
                 _uiState.value = _uiState.value.copy(isConnected = false)
             }
+            "error" -> {
+                val errorMsg = message.payload?.get("message") as? String ?: "Ein Fehler ist aufgetreten"
+                _uiState.value = _uiState.value.copy(error = errorMsg)
+            }
         }
     }
 

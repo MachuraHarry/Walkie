@@ -4,9 +4,10 @@ import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.ronin.walkie.model.ServerMessage
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
 import java.net.URI
@@ -20,8 +21,11 @@ class WalkieWebSocketClient(
     }
 
     private val gson = Gson()
-    private val _messages = Channel<ServerMessage>(Channel.BUFFERED)
-    val messages: Flow<ServerMessage> = _messages.receiveAsFlow()
+    private val _messages = MutableSharedFlow<ServerMessage>(
+        extraBufferCapacity = 100,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val messages: SharedFlow<ServerMessage> = _messages.asSharedFlow()
 
     private var _isConnected = false
     val isConnected: Boolean get() = _isConnected
@@ -29,7 +33,7 @@ class WalkieWebSocketClient(
     override fun onOpen(handshakedata: ServerHandshake?) {
         _isConnected = true
         Log.d(TAG, "WebSocket connected")
-        _messages.trySend(ServerMessage("connected"))
+        _messages.tryEmit(ServerMessage("connected"))
     }
 
     override fun onMessage(message: String) {
@@ -41,7 +45,7 @@ class WalkieWebSocketClient(
                 type = data["type"] as? String ?: "unknown",
                 payload = data["payload"] as? Map<String, Any>
             )
-            _messages.trySend(serverMessage)
+            _messages.tryEmit(serverMessage)
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing message: $message", e)
         }
@@ -50,13 +54,13 @@ class WalkieWebSocketClient(
     override fun onClose(code: Int, reason: String?, remote: Boolean) {
         _isConnected = false
         Log.d(TAG, "WebSocket closed: $reason")
-        _messages.trySend(ServerMessage("disconnected", mapOf("reason" to (reason ?: "unknown"))))
+        _messages.tryEmit(ServerMessage("disconnected", mapOf("reason" to (reason ?: "unknown"))))
     }
 
     override fun onError(ex: Exception) {
         _isConnected = false
         Log.e(TAG, "WebSocket error", ex)
-        _messages.trySend(ServerMessage("error", mapOf("message" to (ex.message ?: "unknown error"))))
+        _messages.tryEmit(ServerMessage("error", mapOf("message" to (ex.message ?: "unknown error"))))
     }
 
     fun sendMessage(type: String, payload: Any? = null) {
