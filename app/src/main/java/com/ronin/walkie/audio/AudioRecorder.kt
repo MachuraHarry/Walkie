@@ -50,6 +50,7 @@ class AudioRecorder(private val activity: Activity) {
     private var silenceStartTime: Long = 0
     private var isPausedByFocusLoss = false
     private var isHeadsetPlugged = false
+    private var isBluetoothScoStarted = false
 
     init {
         bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT) * BUFFER_SIZE_MULTIPLIER
@@ -176,12 +177,63 @@ class AudioRecorder(private val activity: Activity) {
         return rms < SILENCE_THRESHOLD
     }
 
+    /**
+     * Konfiguriert den AudioManager für die Aufnahme über Bluetooth-Headset-Mikrofon.
+     * Dies ist entscheidend, damit Android den Bluetooth-SCO-Kanal für das Mikrofon verwendet.
+     */
+    private fun configureAudioForRecording() {
+        val am = audioManager ?: return
+
+        // Wichtig: MODE_IN_COMMUNICATION muss gesetzt werden, damit Bluetooth SCO funktioniert
+        am.mode = AudioManager.MODE_IN_COMMUNICATION
+
+        if (isHeadsetPlugged && (am.isBluetoothA2dpOn || am.isBluetoothScoAvailableOffCall())) {
+            try {
+                // Bluetooth SCO (Synchronous Connection Oriented) starten
+                // Dies ist der Kanal, über den Bluetooth-Headset-Mikrofone Audio übertragen
+                if (!isBluetoothScoStarted) {
+                    am.startBluetoothSco()
+                    isBluetoothScoStarted = true
+                    Log.d(TAG, "🎧 Bluetooth SCO started for headset microphone")
+                }
+                am.isBluetoothScoOn = true
+                am.isSpeakerphoneOn = false
+                Log.d(TAG, "🎧 Bluetooth SCO routing enabled for recording")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error configuring Bluetooth SCO", e)
+            }
+        } else {
+            // Kein Bluetooth-Headset - normales Mikrofon-Routing
+            am.isBluetoothScoOn = false
+            Log.d(TAG, "🎤 Using device microphone (no Bluetooth headset)")
+        }
+    }
+
+    /**
+     * Stellt die Audio-Konfiguration nach der Aufnahme wieder her.
+     */
+    private fun restoreAudioAfterRecording() {
+        val am = audioManager ?: return
+
+        try {
+            if (isBluetoothScoStarted) {
+                am.isBluetoothScoOn = false
+                am.stopBluetoothSco()
+                isBluetoothScoStarted = false
+                Log.d(TAG, "🎧 Bluetooth SCO stopped")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error stopping Bluetooth SCO", e)
+        }
+    }
+
     fun startRecording(): Boolean {
         Log.d(TAG, "🎤 startRecording() called")
         Log.d(TAG, "   hasPermission=${hasPermission()}")
         Log.d(TAG, "   isRecording=$isRecording")
         Log.d(TAG, "   webSocketClient=${webSocketClient}")
         Log.d(TAG, "   currentChannelId=$currentChannelId")
+        Log.d(TAG, "   isHeadsetPlugged=$isHeadsetPlugged")
 
         if (!hasPermission()) {
             Log.e(TAG, "❌ No audio permission")
@@ -201,6 +253,10 @@ class AudioRecorder(private val activity: Activity) {
         // Audio-Fokus anfordern
         requestAudioFocus()
 
+        // AudioManager für Bluetooth-Headset-Mikrofon konfigurieren
+        // Dies MUSS vor der Erstellung des AudioRecord erfolgen!
+        configureAudioForRecording()
+
         try {
             Log.d(TAG, "   Creating AudioRecord: rate=$SAMPLE_RATE, bufferSize=$bufferSize")
             audioRecord = AudioRecord(
@@ -213,6 +269,7 @@ class AudioRecorder(private val activity: Activity) {
 
             if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
                 Log.e(TAG, "❌ AudioRecord not initialized! state=${audioRecord?.state}")
+                restoreAudioAfterRecording()
                 abandonAudioFocus()
                 return false
             }
@@ -221,6 +278,7 @@ class AudioRecorder(private val activity: Activity) {
             audioRecord?.startRecording()
             if (audioRecord?.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
                 Log.e(TAG, "❌ AudioRecord not recording! state=${audioRecord?.recordingState}")
+                restoreAudioAfterRecording()
                 abandonAudioFocus()
                 return false
             }
@@ -289,10 +347,12 @@ class AudioRecorder(private val activity: Activity) {
             return true
         } catch (e: SecurityException) {
             Log.e(TAG, "❌ Security exception starting recording", e)
+            restoreAudioAfterRecording()
             abandonAudioFocus()
             return false
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error starting recording", e)
+            restoreAudioAfterRecording()
             abandonAudioFocus()
             return false
         }
@@ -321,6 +381,7 @@ class AudioRecorder(private val activity: Activity) {
         Log.d(TAG, "🛑 stopRecording() called")
         isPausedByFocusLoss = false
         stopRecordingInternal()
+        restoreAudioAfterRecording()
         abandonAudioFocus()
     }
 
