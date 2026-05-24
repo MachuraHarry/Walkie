@@ -58,6 +58,24 @@ class AudioPlayer {
     // Callback für Headset-Status-Änderungen (wird vom ViewModel registriert)
     var onHeadsetStateChangeCallback: ((Boolean) -> Unit)? = null
 
+    // Debounce für Headset-Änderungen: Letzte Änderungszeit, um Flackern zu vermeiden
+    private var lastHeadsetChangeTime = 0L
+    private val HEADSET_DEBOUNCE_MS = 500L
+
+    // Hintergrund-Thread für Audio-Routing-Operationen (SCO, AudioManager)
+    // Diese Operationen sind langsam und dürfen den Main-Thread nicht blockieren
+    private val headsetHandler: android.os.Handler
+    private val headsetThread: android.os.HandlerThread
+
+    init {
+        headsetThread = android.os.HandlerThread("AudioPlayer-Headset")
+        headsetThread.start()
+        headsetHandler = android.os.Handler(headsetThread.looper)
+    }
+
+
+
+
 
     // Jitter-Buffer: Thread-sichere Queue für eingehende Audio-Daten
     private val jitterBuffer = ConcurrentLinkedQueue<ByteArray>()
@@ -155,12 +173,13 @@ class AudioPlayer {
                                 12 -> { // STATE_ON
                                     Log.d(TAG, "🎧 Bluetooth turned ON - will check headset state shortly")
                                     // Bluetooth ist jetzt an, aber die Profile verbinden erst.
-                                    // Wir prüfen nach einer kurzen Verzögerung den Headset-Status,
-                                    // damit die Profile Zeit zum Verbinden haben.
-                                    android.os.Handler(context.mainLooper).postDelayed({
+                                    // Wir prüfen nach einer kurzen Verzögerung auf dem Hintergrund-Thread
+                                    // den Headset-Status, damit die Profile Zeit zum Verbinden haben.
+                                    headsetHandler.postDelayed({
                                         refreshHeadsetState()
                                     }, 3000) // 3s warten, bis Profile verbunden sind
                                 }
+
                             }
                         }
                     }
@@ -231,17 +250,49 @@ class AudioPlayer {
 
     /**
      * Wird aufgerufen, wenn sich der Headset-Status ändert.
-     * Bei angeschlossenen Kopfhörern: Audio läuft automatisch über Kopfhörer.
-     * Bei abgezogenen Kopfhörern: Automatisch auf Telefon-Lautsprecher umschalten.
+     * Die eigentlichen Audio-Routing-Operationen (SCO, AudioManager) werden auf einem
+     * Hintergrund-Thread ausgeführt, um den Main-Thread nicht zu blockieren.
+     * 
+     * Enthält einen Debounce-Mechanismus, um Flackern bei mehreren kurz aufeinanderfolgenden
+     * Ereignissen (z.B. Bluetooth A2DP + HFP + SCO) zu vermeiden.
+     * Der Debounce ignoriert nur wiederholte Ereignisse mit dem SELBEN Wert innerhalb von 500ms.
      */
     private fun onHeadsetStateChanged(plugged: Boolean) {
-        if (isHeadsetPlugged == plugged) return // Keine Änderung
+        val now = System.currentTimeMillis()
+        
+        if (isHeadsetPlugged == plugged) return // Keine Änderung zum aktuellen Zustand
+
+        // Debounce: Ignoriere Änderungen, die zu schnell auf die letzte folgen
+        // (verhindert Flackern durch mehrere Bluetooth-Ereignisse in kurzer Zeit)
+        if (now - lastHeadsetChangeTime < HEADSET_DEBOUNCE_MS) {
+            Log.d(TAG, "🎧 Debounce: ignoring headset change to plugged=$plugged " +
+                "(${now - lastHeadsetChangeTime}ms since last change)")
+            return
+        }
 
         isHeadsetPlugged = plugged
+        lastHeadsetChangeTime = now
         Log.d(TAG, "🎧 Headset state changed: plugged=$plugged, isSpeakerOn=$isSpeakerOn")
 
+        // Callback sofort auf dem Main-Thread benachrichtigen (UI-Update)
+        onHeadsetStateChangeCallback?.invoke(plugged)
+
+        // Audio-Routing auf dem Hintergrund-Thread ausführen (SCO, AudioManager)
+        headsetHandler.post {
+            applyHeadsetRouting(plugged)
+        }
+    }
+
+    /**
+     * Führt das Audio-Routing für Headset-Änderungen auf dem Hintergrund-Thread aus.
+     * Diese Operationen (SCO starten/stoppen, AudioManager-Modus) sind langsam und
+     * dürfen den Main-Thread nicht blockieren.
+     */
+    private fun applyHeadsetRouting(plugged: Boolean) {
+        Log.d(TAG, "🎧 applyHeadsetRouting (background thread): plugged=$plugged")
+        
         if (plugged) {
-            // Kopfhörer angeschlossen → IMMER über Kopfhörer ausgeben (unabhängig von isSpeakerOn)
+            // Kopfhörer angeschlossen → IMMER über Kopfhörer ausgeben
             isSpeakerOn = false
             audioManager?.mode = AudioManager.MODE_IN_COMMUNICATION
             audioManager?.isSpeakerphoneOn = false
@@ -259,10 +310,10 @@ class AudioPlayer {
             audioManager?.mode = AudioManager.MODE_NORMAL
             Log.d(TAG, "🎧 Headphones removed: switching to phone speaker")
         }
-
-        // Callback benachrichtigen, damit das ViewModel die UI aktualisieren kann
-        onHeadsetStateChangeCallback?.invoke(plugged)
     }
+
+
+
 
 
 
@@ -635,7 +686,7 @@ class AudioPlayer {
     }
 
     /**
-     * Gibt den Headset-Receiver frei.
+     * Gibt den Headset-Receiver und den Hintergrund-Thread frei.
      */
     fun unregisterHeadsetReceiver() {
         try {
@@ -647,5 +698,14 @@ class AudioPlayer {
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error unregistering headset receiver", e)
         }
+        // Hintergrund-Thread beenden
+        try {
+            if (headsetThread.isAlive) {
+                headsetThread.quitSafely()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error quitting headset thread", e)
+        }
     }
+
 }

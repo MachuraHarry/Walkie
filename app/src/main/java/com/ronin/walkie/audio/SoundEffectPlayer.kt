@@ -5,6 +5,7 @@ import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.util.Log
 import com.ronin.walkie.R
@@ -15,7 +16,7 @@ import com.ronin.walkie.R
  * - off.mp3: Wird abgespielt, wenn jemand aufhört zu senden (bei Sender + allen Zuhörern)
  *
  * Verwendet MediaPlayer.create() für zuverlässige Ressourcen-Verwaltung.
- * Respektiert die Lautsprecher-/Kopfhörer-Einstellung des AudioPlayers.
+ * Läuft auf einem Hintergrund-Thread, um den Main-Thread nicht zu blockieren.
  */
 class SoundEffectPlayer {
 
@@ -28,6 +29,15 @@ class SoundEffectPlayer {
     private var audioManager: AudioManager? = null
     private var isSpeakerOn = true
     private var isHeadsetPlugged = false
+
+    // Hintergrund-Thread für MediaPlayer-Operationen
+    private val soundThread = HandlerThread("SoundEffectPlayer")
+    private val soundHandler: Handler
+
+    init {
+        soundThread.start()
+        soundHandler = Handler(soundThread.looper)
+    }
 
     fun setContext(context: Context) {
         this.context = context
@@ -68,87 +78,61 @@ class SoundEffectPlayer {
 
     /**
      * Spielt eine Sound-Ressource ab.
-     * Nutzt MediaPlayer.create() für zuverlässige Initialisierung.
-     * Stoppt vorherige Sounds, damit sie sich nicht überlagern.
-     * Respektiert die Lautsprecher-/Kopfhörer-Einstellung.
+     * Läuft komplett auf einem Hintergrund-Thread, um den Main-Thread nicht zu blockieren.
+     * MediaPlayer.create() und start() sind asynchrone Operationen, die auf dem
+     * Hintergrund-Thread ausgeführt werden.
      */
     private fun playSound(resId: Int) {
-        try {
-            // Vorherigen MediaPlayer stoppen und freigeben
-            releaseMediaPlayer()
+        soundHandler.post {
+            try {
+                // Vorherigen MediaPlayer stoppen und freigeben
+                releaseMediaPlayer()
 
-            val ctx = context ?: run {
-                Log.w(TAG, "⚠️ Context not set, cannot play sound")
-                return
-            }
-
-            // MediaPlayer muss auf dem Main-Thread ausgeführt werden
-            val mainHandler = Handler(Looper.getMainLooper())
-            mainHandler.post {
-                try {
-                    // MediaPlayer.create() ist zuverlässiger als manuelle Initialisierung
-                    val mp = MediaPlayer.create(ctx, resId)
-                    if (mp == null) {
-                        Log.e(TAG, "❌ MediaPlayer.create() returned null for resource $resId")
-                        return@post
-                    }
-
-                    // Audio-Attribute für Voice Communication setzen
-                    mp.setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .build()
-                    )
-
-                    mediaPlayer = mp
-
-                    // Audio-Routing anwenden: Wenn Kopfhörer angeschlossen sind und
-                    // Lautsprecher AUS ist, läuft der Sound über Kopfhörer.
-                    // Wenn der Benutzer den Lautsprecher eingeschaltet hat, wird auch
-                    // bei angeschlossenen Kopfhörern über den Telefon-Lautsprecher ausgegeben.
-                    audioManager?.let { am ->
-                        if (isHeadsetPlugged && !isSpeakerOn) {
-                            // Kopfhörer angeschlossen, Lautsprecher AUS → über Kopfhörer
-                            am.mode = AudioManager.MODE_NORMAL
-                            am.isSpeakerphoneOn = false
-                        } else if (isHeadsetPlugged && isSpeakerOn) {
-                            // Kopfhörer angeschlossen, aber Lautsprecher AN → über Telefon-Lautsprecher
-                            am.isSpeakerphoneOn = true
-                            am.mode = AudioManager.MODE_NORMAL
-                        } else {
-                            am.isSpeakerphoneOn = isSpeakerOn
-                            am.mode = if (isSpeakerOn) AudioManager.MODE_NORMAL else AudioManager.MODE_IN_COMMUNICATION
-                        }
-                    }
-
-
-                    mp.setOnCompletionListener { player ->
-                        Log.d(TAG, "✅ Sound playback completed")
-                        player.release()
-                        if (mediaPlayer == player) {
-                            mediaPlayer = null
-                        }
-                    }
-
-                    mp.setOnErrorListener { player, what, extra ->
-                        Log.e(TAG, "❌ MediaPlayer error: what=$what, extra=$extra")
-                        player.release()
-                        if (mediaPlayer == player) {
-                            mediaPlayer = null
-                        }
-                        true
-                    }
-
-                    mp.start()
-                    Log.d(TAG, "▶️ Sound started playing (speaker=$isSpeakerOn, headset=$isHeadsetPlugged)")
-                } catch (e: Exception) {
-                    Log.e(TAG, "❌ Error playing sound", e)
-                    releaseMediaPlayer()
+                val ctx = context ?: run {
+                    Log.w(TAG, "⚠️ Context not set, cannot play sound")
+                    return@post
                 }
+
+                // MediaPlayer auf Hintergrund-Thread erstellen
+                val mp = MediaPlayer.create(ctx, resId)
+                if (mp == null) {
+                    Log.e(TAG, "❌ MediaPlayer.create() returned null for resource $resId")
+                    return@post
+                }
+
+                // Audio-Attribute für Voice Communication setzen.
+                mp.setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+
+                mediaPlayer = mp
+
+                mp.setOnCompletionListener { player ->
+                    Log.d(TAG, "✅ Sound playback completed")
+                    player.release()
+                    if (mediaPlayer == player) {
+                        mediaPlayer = null
+                    }
+                }
+
+                mp.setOnErrorListener { player, what, extra ->
+                    Log.e(TAG, "❌ MediaPlayer error: what=$what, extra=$extra")
+                    player.release()
+                    if (mediaPlayer == player) {
+                        mediaPlayer = null
+                    }
+                    true
+                }
+
+                mp.start()
+                Log.d(TAG, "▶️ Sound started playing (speaker=$isSpeakerOn, headset=$isHeadsetPlugged)")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error playing sound", e)
+                releaseMediaPlayer()
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error posting to main thread", e)
         }
     }
 
@@ -157,7 +141,10 @@ class SoundEffectPlayer {
      */
     fun release() {
         Log.d(TAG, "🛑 Releasing SoundEffectPlayer")
-        releaseMediaPlayer()
+        soundHandler.post {
+            releaseMediaPlayer()
+        }
+        soundThread.quitSafely()
     }
 
     private fun releaseMediaPlayer() {
@@ -175,3 +162,4 @@ class SoundEffectPlayer {
         }
     }
 }
+

@@ -52,11 +52,19 @@ class AudioRecorder(private val activity: Activity) {
     private var isHeadsetPlugged = false
     private var isBluetoothScoStarted = false
 
+    // Hintergrund-Thread für AudioManager-Operationen (SCO, Routing)
+    private val audioHandler: android.os.Handler
+    private val audioThread: android.os.HandlerThread
+
     init {
         bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT) * BUFFER_SIZE_MULTIPLIER
         audioManager = activity.getSystemService(Activity.AUDIO_SERVICE) as? AudioManager
+        audioThread = android.os.HandlerThread("AudioRecorder-Audio")
+        audioThread.start()
+        audioHandler = android.os.Handler(audioThread.looper)
         Log.d(TAG, "🏗️ AudioRecorder created, bufferSize=$bufferSize")
     }
+
 
     fun setWebSocketClient(client: WalkieWebSocketClient) {
         Log.d(TAG, "🔗 setWebSocketClient: $client")
@@ -104,6 +112,7 @@ class AudioRecorder(private val activity: Activity) {
         audioFocusListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
             when (focusChange) {
                 AudioManager.AUDIOFOCUS_LOSS -> {
+                    // Dauerhafter Fokus-Verlust (z.B. Telefonanruf) → Aufnahme stoppen
                     Log.w(TAG, "🔇 Audio focus LOST. Stopping recording.")
                     hasAudioFocus = false
                     if (isRecording) {
@@ -112,12 +121,13 @@ class AudioRecorder(private val activity: Activity) {
                     }
                 }
                 AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-                    Log.w(TAG, "🔇 Audio focus LOST (transient). Pausing recording.")
+                    // Kurzer Fokus-Verlust (z.B. eigener SoundEffectPlayer) → NICHT stoppen!
+                    // Der SoundEffectPlayer verwendet FLAG_ALLOW_IN_REDUCTION_NO_FOCUS,
+                    // daher sollte dies nicht passieren. Falls doch, ignorieren wir es,
+                    // da es nur ein kurzer Sound ist und die Aufnahme nicht unterbrochen werden soll.
+                    Log.w(TAG, "🔇 Audio focus LOST (transient). IGNORING - continuing recording.")
                     hasAudioFocus = false
-                    if (isRecording) {
-                        isPausedByFocusLoss = true
-                        stopRecordingInternal()
-                    }
+                    // NICHT stoppen - der Fokus kommt sofort zurück
                 }
                 AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                     Log.d(TAG, "🔉 Audio focus lost (can duck). Continuing recording.")
@@ -135,11 +145,16 @@ class AudioRecorder(private val activity: Activity) {
             }
         }
 
+
+        // AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK: Erlaubt anderen Apps/Sounds, sich zu melden,
+        // ohne dass die Aufnahme unterbrochen wird. Verhindert, dass der SoundEffectPlayer
+        // (MediaPlayer) der Walkie-App selbst den Fokus entzieht und die Aufnahme abbricht.
         val result = audioManager?.requestAudioFocus(
             audioFocusListener!!,
             AudioManager.STREAM_VOICE_CALL,
-            AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+            AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
         )
+
 
         hasAudioFocus = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
         Log.d(TAG, "🔊 Audio focus request: ${if (hasAudioFocus) "GRANTED" else "DENIED"}")
@@ -250,12 +265,12 @@ class AudioRecorder(private val activity: Activity) {
             return false
         }
 
-        // Audio-Fokus anfordern
+        // Audio-Fokus und AudioManager-Konfiguration auf Hintergrund-Thread ausführen
+        // (diese Operationen blockieren den Main-Thread und verursachen Ruckeln)
+        audioHandler.post {
+            configureAudioForRecording()
+        }
         requestAudioFocus()
-
-        // AudioManager für Bluetooth-Headset-Mikrofon konfigurieren
-        // Dies MUSS vor der Erstellung des AudioRecord erfolgen!
-        configureAudioForRecording()
 
         try {
             Log.d(TAG, "   Creating AudioRecord: rate=$SAMPLE_RATE, bufferSize=$bufferSize")
@@ -269,7 +284,9 @@ class AudioRecorder(private val activity: Activity) {
 
             if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
                 Log.e(TAG, "❌ AudioRecord not initialized! state=${audioRecord?.state}")
-                restoreAudioAfterRecording()
+                audioHandler.post {
+                    restoreAudioAfterRecording()
+                }
                 abandonAudioFocus()
                 return false
             }
@@ -278,7 +295,9 @@ class AudioRecorder(private val activity: Activity) {
             audioRecord?.startRecording()
             if (audioRecord?.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
                 Log.e(TAG, "❌ AudioRecord not recording! state=${audioRecord?.recordingState}")
-                restoreAudioAfterRecording()
+                audioHandler.post {
+                    restoreAudioAfterRecording()
+                }
                 abandonAudioFocus()
                 return false
             }
@@ -347,16 +366,21 @@ class AudioRecorder(private val activity: Activity) {
             return true
         } catch (e: SecurityException) {
             Log.e(TAG, "❌ Security exception starting recording", e)
-            restoreAudioAfterRecording()
+            audioHandler.post {
+                restoreAudioAfterRecording()
+            }
             abandonAudioFocus()
             return false
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error starting recording", e)
-            restoreAudioAfterRecording()
+            audioHandler.post {
+                restoreAudioAfterRecording()
+            }
             abandonAudioFocus()
             return false
         }
     }
+
 
     private fun stopRecordingInternal() {
         Log.d(TAG, "🛑 stopRecordingInternal() called")
@@ -381,9 +405,13 @@ class AudioRecorder(private val activity: Activity) {
         Log.d(TAG, "🛑 stopRecording() called")
         isPausedByFocusLoss = false
         stopRecordingInternal()
-        restoreAudioAfterRecording()
-        abandonAudioFocus()
+        // AudioManager-Operationen auf Hintergrund-Thread ausführen
+        audioHandler.post {
+            restoreAudioAfterRecording()
+            abandonAudioFocus()
+        }
     }
+
 
     fun isRecording(): Boolean {
         Log.d(TAG, "🔍 isRecording() = $isRecording")

@@ -290,9 +290,21 @@ class ChannelViewModel(
         savedStateHandle.remove<String>("saved_channel_name")
     }
 
+    // Debounce: Verhindert, dass startTransmitting() innerhalb von 150ms nach
+    // stopTransmitting() aufgerufen wird (z.B. durch verzögerte UI-Events).
+    private var lastStopTime = 0L
+
     fun startTransmitting() {
         Log.d(TAG, "🔴 startTransmitting()")
         val channelId = _uiState.value.channel?.id ?: return
+
+        // Debounce: Wenn stopTransmitting() vor weniger als 150ms aufgerufen wurde,
+        // ignoriere diesen Aufruf (verhindert Race Conditions durch den SoundEffectPlayer)
+        val now = System.currentTimeMillis()
+        if (now - lastStopTime < 150) {
+            Log.w(TAG, "   ⏱️ Debounce: startTransmitting() ignored (${now - lastStopTime}ms since stop)")
+            return
+        }
 
         if (!webSocketClient.isConnected) {
             Log.w(TAG, "   Not connected, cannot transmit")
@@ -312,6 +324,7 @@ class ChannelViewModel(
     fun stopTransmitting() {
         Log.d(TAG, "🟢 stopTransmitting()")
         val channelId = _uiState.value.channel?.id ?: return
+        lastStopTime = System.currentTimeMillis()
         _uiState.value = _uiState.value.copy(isTransmitting = false)
         webSocketClient.stopTalking(channelId)
         audioRecorder.stopRecording()
@@ -319,10 +332,12 @@ class ChannelViewModel(
         soundEffectPlayer.playOffSound()
     }
 
+
     fun toggleTransmitting() {
         val currentState = _uiState.value
         if (currentState.isToggleMode) {
             // Toggle ausschalten
+            Log.d(TAG, "🔓 Toggle OFF")
             _uiState.value = currentState.copy(isToggleMode = false, isTransmitting = false)
             audioRecorder.stopRecording()
             val channelId = _uiState.value.channel?.id ?: return
@@ -331,14 +346,27 @@ class ChannelViewModel(
             soundEffectPlayer.playOffSound()
         } else {
             // Toggle einschalten
+            Log.d(TAG, "🔒 Toggle ON")
             _uiState.value = currentState.copy(isToggleMode = true, isTransmitting = true)
-            audioRecorder.startRecording()
+            // ✅ Nur startRecording() aufrufen, wenn nicht bereits aufgenommen wird
+            // (beim Einrasten aus dem PTT-Modus läuft die Aufnahme bereits)
+            if (!audioRecorder.isRecording()) {
+                audioRecorder.startRecording()
+            } else {
+                Log.d(TAG, "   Recording already active, skipping startRecording()")
+            }
             val channelId = _uiState.value.channel?.id ?: return
+            // ✅ Nur startTalking() senden, wenn nicht bereits gesendet wird
+            // (beim Einrasten aus dem PTT-Modus läuft startTalking bereits)
             webSocketClient.startTalking(channelId)
-            // ON-Sound für den Sender selbst abspielen
-            soundEffectPlayer.playOnSound()
+            // ON-Sound nur abspielen, wenn die Aufnahme gerade erst gestartet wurde
+            // (beim Einrasten aus dem PTT-Modus wurde der ON-Sound bereits abgespielt)
+            if (!currentState.isTransmitting) {
+                soundEffectPlayer.playOnSound()
+            }
         }
     }
+
 
     fun toggleSpeaker() {
         val currentState = _uiState.value

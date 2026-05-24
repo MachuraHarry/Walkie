@@ -665,11 +665,13 @@ fun PTTButton(
                                         hasLocked = true
                                         isFingerDown = false
                                         dragOffsetPx = 0f
-                                        onStopTransmitting()
+                                        // ✅ Beim Einrasten: Aufnahme NICHT stoppen und neu starten!
+                                        // Einfach in den Toggle-Modus wechseln, die Aufnahme läuft weiter.
                                         onToggleTransmitting()
                                         change.consume()
                                         break
                                     }
+
                                 } else if (isToggleMode) {
                                     // Im eingerasteten Modus: nach unten ziehen zum Lösen
                                     dragOffsetPx = offsetY.coerceAtLeast(0f)
