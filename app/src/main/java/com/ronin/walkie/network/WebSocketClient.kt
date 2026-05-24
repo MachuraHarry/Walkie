@@ -64,14 +64,18 @@ class WalkieWebSocketClient(
     }
 
     fun sendMessage(type: String, payload: Any? = null) {
-        if (!isOpen) {
-            Log.w(TAG, "Cannot send message, not connected")
-            return
+        try {
+            if (!isOpen) {
+                Log.w(TAG, "Cannot send message ($type), not connected")
+                return
+            }
+            val message = mapOf("type" to type, "payload" to payload)
+            val json = gson.toJson(message)
+            Log.d(TAG, "Sending: $json")
+            send(json)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error sending message: $type", e)
         }
-        val message = mapOf("type" to type, "payload" to payload)
-        val json = gson.toJson(message)
-        Log.d(TAG, "Sending: $json")
-        send(json)
     }
 
     fun login(username: String) {

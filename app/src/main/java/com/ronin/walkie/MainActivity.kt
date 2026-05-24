@@ -1,15 +1,22 @@
 package com.ronin.walkie
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -133,11 +140,36 @@ fun WalkieNavHost(app: WalkieApplication) {
                 scaleOut(animationSpec = androidx.compose.animation.core.tween(300)) + fadeOut()
             }
         ) { backStackEntry ->
+            val context = LocalContext.current
+            var hasPermission by remember {
+                mutableStateOf(
+                    ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.RECORD_AUDIO
+                    ) == PackageManager.PERMISSION_GRANTED
+                )
+            }
+
+            val permissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestPermission()
+            ) { isGranted ->
+                hasPermission = isGranted
+                if (!isGranted) {
+                    Toast.makeText(context, "Audio-Berechtigung wird für Walkie Talkie benötigt", Toast.LENGTH_LONG).show()
+                }
+            }
+
+            LaunchedEffect(Unit) {
+                if (!hasPermission) {
+                    permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                }
+            }
+
             val channel = navController.previousBackStackEntry
                 ?.savedStateHandle
                 ?.get<Channel>("channel")
 
-            if (channel != null) {
+            if (channel != null && hasPermission) {
                 val username = loginViewModel.uiState.value.username
                 val signalingClient = app.signalingClient
                 val webRTCManager = remember(username) {
