@@ -197,15 +197,25 @@ class ChannelViewModel(
     /**
      * Registriert einen Callback für Headset-Status-Änderungen vom AudioPlayer.
      * Wird aufgerufen, wenn der BroadcastReceiver im AudioPlayer eine Änderung erkennt.
+     * Synchronisiert alle Audio-Komponenten und die UI.
      */
     private fun registerHeadsetCallback() {
         audioPlayer.onHeadsetStateChangeCallback = { plugged ->
             Log.d(TAG, "🎧 Headset state callback: plugged=$plugged")
             soundEffectPlayer.setHeadsetPlugged(plugged)
             audioRecorder.setHeadsetPlugged(plugged)
-            _uiState.value = _uiState.value.copy(isHeadsetPlugged = plugged)
+
+            // isSpeakerOn vom AudioPlayer übernehmen (wird bei Headset-Wechsel automatisch gesetzt)
+            val currentSpeakerState = audioPlayer.isSpeakerOn()
+            soundEffectPlayer.setSpeakerphoneOn(currentSpeakerState)
+
+            _uiState.value = _uiState.value.copy(
+                isHeadsetPlugged = plugged,
+                isSpeakerOn = currentSpeakerState
+            )
         }
     }
+
 
 
 

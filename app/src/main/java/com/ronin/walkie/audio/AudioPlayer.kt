@@ -105,6 +105,8 @@ class AudioPlayer {
      * Reagiert auf:
      * - ACTION_HEADSET_PLUG: Kabelgebundene Kopfhörer werden ein-/abgesteckt
      * - ACTION_AUDIO_BECOMING_NOISY: Kopfhörer werden entfernt (zuverlässiger)
+     * - Bluetooth A2DP: Bluetooth-Kopfhörer Verbindungsstatus
+     * - Bluetooth SCO: Bluetooth SCO Verbindungsstatus
      */
     private fun registerHeadsetReceiver(context: Context) {
         try {
@@ -112,6 +114,8 @@ class AudioPlayer {
                 addAction(Intent.ACTION_HEADSET_PLUG)
                 addAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
                 addAction("android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED")
+                addAction("android.bluetooth.headset.profile.action.CONNECTION_STATE_CHANGED")
+                addAction("android.bluetooth.adapter.action.STATE_CHANGED")
             }
 
             headsetReceiver = object : BroadcastReceiver() {
@@ -129,11 +133,26 @@ class AudioPlayer {
                             onHeadsetStateChanged(false)
                         }
                         "android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED" -> {
-                            // Bluetooth-Kopfhörer
+                            // Bluetooth-Audio-Kopfhörer (A2DP)
                             val state = intent.getIntExtra("android.bluetooth.profile.extra.STATE", -1)
                             val connected = state == 2 // STATE_CONNECTED
                             Log.d(TAG, "🎧 Bluetooth A2DP profile changed: connected=$connected")
                             onHeadsetStateChanged(connected)
+                        }
+                        "android.bluetooth.headset.profile.action.CONNECTION_STATE_CHANGED" -> {
+                            // Bluetooth-Headset (HFP - Hands-Free Profile, für SCO)
+                            val state = intent.getIntExtra("android.bluetooth.profile.extra.STATE", -1)
+                            val connected = state == 2 // STATE_CONNECTED
+                            Log.d(TAG, "🎧 Bluetooth Headset (HFP) profile changed: connected=$connected")
+                            onHeadsetStateChanged(connected)
+                        }
+                        "android.bluetooth.adapter.action.STATE_CHANGED" -> {
+                            // Bluetooth-Adapter wurde ausgeschaltet
+                            val state = intent.getIntExtra("android.bluetooth.adapter.extra.STATE", -1)
+                            if (state == 10) { // STATE_OFF = 10
+                                Log.d(TAG, "🎧 Bluetooth adapter turned OFF")
+                                onHeadsetStateChanged(false)
+                            }
                         }
                     }
                 }
@@ -145,6 +164,7 @@ class AudioPlayer {
             Log.e(TAG, "❌ Error registering headset receiver", e)
         }
     }
+
 
     /**
      * Startet Bluetooth SCO für die Audio-Kommunikation über Bluetooth-Headset.
@@ -207,11 +227,13 @@ class AudioPlayer {
         } else {
             // Kopfhörer entfernt → Bluetooth SCO stoppen
             stopBluetoothSco()
-            // zurück zum eingestellten Lautsprecher-Modus
-            audioManager?.isSpeakerphoneOn = isSpeakerOn
-            audioManager?.mode = if (isSpeakerOn) AudioManager.MODE_NORMAL else AudioManager.MODE_IN_COMMUNICATION
-            Log.d(TAG, "🎧 Headphones removed: restoring speaker mode (isSpeakerOn=$isSpeakerOn)")
+            // Automatisch auf Telefon-Lautsprecher umschalten
+            isSpeakerOn = true
+            audioManager?.isSpeakerphoneOn = true
+            audioManager?.mode = AudioManager.MODE_NORMAL
+            Log.d(TAG, "🎧 Headphones removed: switching to phone speaker")
         }
+
 
         // Callback benachrichtigen, damit das ViewModel die UI aktualisieren kann
         onHeadsetStateChangeCallback?.invoke(plugged)
