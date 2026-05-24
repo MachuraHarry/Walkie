@@ -194,6 +194,21 @@ class ChannelViewModel(
         }
     }
 
+    /**
+     * Registriert einen Callback für Headset-Status-Änderungen vom AudioPlayer.
+     * Wird aufgerufen, wenn der BroadcastReceiver im AudioPlayer eine Änderung erkennt.
+     */
+    private fun registerHeadsetCallback() {
+        audioPlayer.onHeadsetStateChangeCallback = { plugged ->
+            Log.d(TAG, "🎧 Headset state callback: plugged=$plugged")
+            soundEffectPlayer.setHeadsetPlugged(plugged)
+            audioRecorder.setHeadsetPlugged(plugged)
+            _uiState.value = _uiState.value.copy(isHeadsetPlugged = plugged)
+        }
+    }
+
+
+
     fun joinChannel(channel: Channel) {
         Log.d(TAG, "🚪 joinChannel: #${channel.id} '${channel.name}'")
         Log.d(TAG, "   webSocketClient.isConnected=${webSocketClient.isConnected}")
@@ -216,6 +231,9 @@ class ChannelViewModel(
         audioPlayer.startPlayback()
         webSocketClient.joinChannel(channel.id)
 
+        // Headset-Callback registrieren für sofortige UI-Updates
+        registerHeadsetCallback()
+
         // SoundEffectPlayer und AudioRecorder mit aktuellem Audio-Routing synchronisieren
         soundEffectPlayer.setSpeakerphoneOn(audioPlayer.isSpeakerOn())
         val headsetPlugged = audioPlayer.isHeadsetPlugged()
@@ -225,6 +243,7 @@ class ChannelViewModel(
             isSpeakerOn = audioPlayer.isSpeakerOn(),
             isHeadsetPlugged = headsetPlugged
         )
+
     }
 
     fun leaveChannel() {

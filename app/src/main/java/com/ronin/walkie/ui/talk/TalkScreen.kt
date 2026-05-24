@@ -174,20 +174,29 @@ fun TalkScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                         }
 
-                        // Lautsprecher-Status in der Bottom-Bar
+                        // Audio-Ausgangs-Status in der Bottom-Bar
+                        val isAudioThroughHeadphones = uiState.isHeadsetPlugged && !uiState.isSpeakerOn
                         Icon(
-                            if (uiState.isSpeakerOn) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
-                            contentDescription = "Lautsprecher",
+                            when {
+                                isAudioThroughHeadphones -> Icons.Default.Headphones
+                                uiState.isSpeakerOn -> Icons.Default.VolumeUp
+                                else -> Icons.Default.VolumeOff
+                            },
+                            contentDescription = "Audio-Ausgang",
                             modifier = Modifier.size(16.dp),
-                            tint = if (uiState.isSpeakerOn) {
-                                Color(0xFF4CAF50)
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = when {
+                                isAudioThroughHeadphones -> Color(0xFF2196F3)
+                                uiState.isSpeakerOn -> Color(0xFF4CAF50)
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
                             }
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            if (uiState.isSpeakerOn) "Lautsprecher an" else "Lautsprecher aus",
+                            when {
+                                isAudioThroughHeadphones -> "Kopfhörer"
+                                uiState.isSpeakerOn -> "Lautsprecher an"
+                                else -> "Lautsprecher aus"
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -240,23 +249,34 @@ fun TalkScreen(
                     onToggleTransmitting = onToggleTransmitting
                 )
 
-                // Lautsprecher-Button rechts neben dem PTT-Button
+                // Lautsprecher-/Kopfhörer-Button rechts neben dem PTT-Button
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .padding(end = 8.dp)
                 ) {
+                    // Button zeigt je nach Zustand:
+                    // - Kopfhörer angeschlossen + Lautsprecher AUS → Headphones-Icon (blau)
+                    // - Kopfhörer angeschlossen + Lautsprecher AN → VolumeUp-Icon (grün)
+                    // - Keine Kopfhörer + Lautsprecher AN → VolumeUp-Icon (grün)
+                    // - Keine Kopfhörer + Lautsprecher AUS → VolumeOff-Icon (grau)
+                    val isAudioThroughHeadphones = uiState.isHeadsetPlugged && !uiState.isSpeakerOn
+                    
                     IconButton(
                         onClick = onToggleSpeaker,
                         modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
-                            if (uiState.isSpeakerOn) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                            when {
+                                isAudioThroughHeadphones -> Icons.Default.Headphones
+                                uiState.isSpeakerOn -> Icons.Default.VolumeUp
+                                else -> Icons.Default.VolumeOff
+                            },
                             contentDescription = "Lautsprecher",
-                            tint = if (uiState.isSpeakerOn) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = when {
+                                isAudioThroughHeadphones -> Color(0xFF2196F3) // Blau für Kopfhörer
+                                uiState.isSpeakerOn -> Color(0xFF4CAF50) // Grün für Lautsprecher an
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant // Grau für aus
                             },
                             modifier = Modifier.size(28.dp)
                         )

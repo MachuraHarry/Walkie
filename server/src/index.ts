@@ -139,7 +139,14 @@ wss.on('connection', (ws, req) => {
   // Sende "connected" Nachricht an den Client
   sendToClient(ws, { type: 'connected', payload: { timestamp: Date.now() } });
 
-  ws.on('message', (rawData) => {
+  ws.on('message', (rawData: Buffer, isBinary: boolean) => {
+    if (isBinary) {
+      // Binäre Audio-Daten direkt verarbeiten (kein JSON-Parsing nötig)
+      debugLog('RECV', `📦 Binary frame received: ${rawData.length} bytes`);
+      handleBinaryAudioData(ws, rawData);
+      return;
+    }
+
     try {
       const rawStr = rawData.toString();
       debugLog('RECV', `📩 Raw message (${rawStr.length} chars): ${rawStr.substring(0, 300)}`);
@@ -150,6 +157,11 @@ wss.on('connection', (ws, req) => {
       sendToClient(ws, { type: 'error', payload: { message: 'Invalid message format' } });
     }
   });
+
+
+
+
+
 
   ws.on('close', (code, reason) => {
     debugLog('WS', `🔌 Connection closed: code=${code}, reason=${reason?.toString() || 'none'}`);
@@ -458,6 +470,25 @@ function handleStopTalking(ws: WebSocket, payload: { channelId: number }): void 
 // Audio Relay - Der Kern der Walkie-Talkie Funktionalität
 // ============================================================
 
+/**
+ * Binäres Audio-Frame-Format:
+ * 
+ * [1 Byte Channel-ID Länge][Channel-ID UTF-8][1 Byte Username Länge][Username UTF-8][PCM-Daten]
+ * 
+ * Vereinfachte Variante: Wir senden zuerst einen JSON-Header (Text-Frame),
+ * dann die Binär-Daten (Binary-Frame). Der Client erwartet nach einem
+ * "audio_meta"-Text-Frame den nächsten Binary-Frame als Audio-Daten.
+ * 
+ * Noch einfacher (und besser): Wir packen alles in ein Binary-Frame:
+ * 
+ * Byte 0-3:   Channel-ID (Int32, Little-Endian)
+ * Byte 4-7:   Username-Länge (Int32, Little-Endian)
+ * Byte 8..n:  Username (UTF-8)
+ * Byte n+1..: PCM-Audio-Daten (roh)
+ */
+
+const INT32_SIZE = 4; // 4 Bytes pro Int32
+
 function handleAudioData(ws: WebSocket, payload: { channelId: number; data: string }): void {
   const info = clients.get(ws);
   if (!info) {
@@ -482,6 +513,83 @@ function handleAudioData(ws: WebSocket, payload: { channelId: number; data: stri
       data: payload.data,
     }
   }, ws);
+}
+
+/**
+ * Verarbeitet eingehende binäre Audio-Daten.
+ * Format: [ChannelId:4Bytes][UsernameLen:4Bytes][Username:UTF8][PCM-Daten]
+ */
+function handleBinaryAudioData(ws: WebSocket, binaryData: Buffer): void {
+  const info = clients.get(ws);
+  if (!info) {
+    debugLog('AUDIO_BIN', 'Not logged in, ignoring binary audio');
+    return;
+  }
+
+  if (binaryData.length < INT32_SIZE * 2) {
+    debugLog('AUDIO_BIN', `Binary frame too short: ${binaryData.length} bytes`);
+    return;
+  }
+
+  let offset = 0;
+  
+  // Channel-ID lesen (Int32, Little-Endian)
+  const channelId = binaryData.readInt32LE(offset);
+  offset += INT32_SIZE;
+  
+  // Username-Länge lesen (Int32, Little-Endian)
+  const usernameLen = binaryData.readInt32LE(offset);
+  offset += INT32_SIZE;
+  
+  if (offset + usernameLen > binaryData.length) {
+    debugLog('AUDIO_BIN', `Invalid username length: ${usernameLen}, buffer=${binaryData.length}`);
+    return;
+  }
+  
+  // Username lesen (UTF-8)
+  const username = binaryData.toString('utf8', offset, offset + usernameLen);
+  offset += usernameLen;
+  
+  // Rest sind PCM-Daten
+  const pcmData = binaryData.subarray(offset);
+  
+  debugLog('AUDIO_BIN', `🎤 Binary audio from "${username}" in channel #${channelId}: ${pcmData.length} PCM bytes`);
+
+  if (info.channelId !== channelId) {
+    debugLog('AUDIO_BIN', `User "${info.username}" is not in channel #${channelId} (in #${info.channelId}), ignoring`);
+    return;
+  }
+
+  // Binär an alle anderen im Channel weiterleiten
+  broadcastBinaryAudio(channelId, binaryData, ws);
+}
+
+/**
+ * Broadcastet binäre Audio-Daten an alle Mitglieder eines Channels (außer dem Sender).
+ */
+function broadcastBinaryAudio(channelId: number, binaryData: Buffer, excludeWs?: WebSocket): void {
+  const channel = channels.get(channelId);
+  if (!channel) {
+    debugLog('AUDIO_BIN', `Channel #${channelId} not found for binary broadcast`);
+    return;
+  }
+
+  let sentCount = 0;
+  for (const memberName of channel.members) {
+    for (const [ws, info] of clients) {
+      if (info.username === memberName && ws !== excludeWs) {
+        if (ws.readyState === WebSocket.OPEN) {
+          try {
+            ws.send(binaryData);
+            sentCount++;
+          } catch (error) {
+            debugLog('AUDIO_BIN', `Error sending binary to ${info.username}: ${error}`);
+          }
+        }
+      }
+    }
+  }
+  debugLog('AUDIO_BIN', `Sent binary audio to ${sentCount} clients in channel #${channelId}`);
 }
 
 // ============================================================

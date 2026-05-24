@@ -103,18 +103,25 @@ class SoundEffectPlayer {
 
                     mediaPlayer = mp
 
-                    // Audio-Routing anwenden: Wenn Kopfhörer angeschlossen sind,
-                    // läuft der Sound über Kopfhörer, sonst über die Lautsprecher-Einstellung
+                    // Audio-Routing anwenden: Wenn Kopfhörer angeschlossen sind und
+                    // Lautsprecher AUS ist, läuft der Sound über Kopfhörer.
+                    // Wenn der Benutzer den Lautsprecher eingeschaltet hat, wird auch
+                    // bei angeschlossenen Kopfhörern über den Telefon-Lautsprecher ausgegeben.
                     audioManager?.let { am ->
-                        if (isHeadsetPlugged) {
-                            // Kopfhörer haben Vorrang
+                        if (isHeadsetPlugged && !isSpeakerOn) {
+                            // Kopfhörer angeschlossen, Lautsprecher AUS → über Kopfhörer
                             am.mode = AudioManager.MODE_NORMAL
                             am.isSpeakerphoneOn = false
+                        } else if (isHeadsetPlugged && isSpeakerOn) {
+                            // Kopfhörer angeschlossen, aber Lautsprecher AN → über Telefon-Lautsprecher
+                            am.isSpeakerphoneOn = true
+                            am.mode = AudioManager.MODE_NORMAL
                         } else {
                             am.isSpeakerphoneOn = isSpeakerOn
                             am.mode = if (isSpeakerOn) AudioManager.MODE_NORMAL else AudioManager.MODE_IN_COMMUNICATION
                         }
                     }
+
 
                     mp.setOnCompletionListener { player ->
                         Log.d(TAG, "✅ Sound playback completed")

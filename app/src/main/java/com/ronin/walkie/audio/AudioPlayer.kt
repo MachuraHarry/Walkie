@@ -55,6 +55,10 @@ class AudioPlayer {
     private var headsetReceiver: BroadcastReceiver? = null
     private var isBluetoothScoStarted = false
 
+    // Callback für Headset-Status-Änderungen (wird vom ViewModel registriert)
+    var onHeadsetStateChangeCallback: ((Boolean) -> Unit)? = null
+
+
     // Jitter-Buffer: Thread-sichere Queue für eingehende Audio-Daten
     private val jitterBuffer = ConcurrentLinkedQueue<ByteArray>()
     private var bufferedBytes = AtomicBoolean(false)
@@ -69,13 +73,32 @@ class AudioPlayer {
     }
 
     /**
-     * Prüft den initialen Headset-Status.
+     * Prüft den initialen Headset-Status und wendet sofort das korrekte Audio-Routing an.
+     * Prüft sowohl kabelgebundene Kopfhörer als auch Bluetooth A2DP und SCO.
      */
     private fun checkHeadsetState(context: Context) {
-        val audioManager = audioManager ?: return
-        isHeadsetPlugged = audioManager.isWiredHeadsetOn || audioManager.isBluetoothA2dpOn
-        Log.d(TAG, "🎧 Initial headset state: plugged=$isHeadsetPlugged")
+        val am = audioManager ?: return
+        val wired = am.isWiredHeadsetOn
+        val bluetoothA2dp = am.isBluetoothA2dpOn
+        val bluetoothSco = am.isBluetoothScoOn
+        isHeadsetPlugged = wired || bluetoothA2dp || bluetoothSco
+        Log.d(TAG, "🎧 Initial headset state: plugged=$isHeadsetPlugged (wired=$wired, a2dp=$bluetoothA2dp, sco=$bluetoothSco)")
+
+        // Sofort Audio-Routing anwenden, damit bei bereits angeschlossenen Kopfhörern
+        // der Ton über die Kopfhörer läuft (isSpeakerOn ist standardmäßig true, also
+        // nur umschalten wenn Kopfhörer angeschlossen sind)
+        if (isHeadsetPlugged) {
+            isSpeakerOn = false
+            applyAudioRouting()
+            Log.d(TAG, "🎧 Headphones detected at startup: switching to headphone mode")
+        }
+
+        // Callback benachrichtigen, falls bereits registriert
+        onHeadsetStateChangeCallback?.invoke(isHeadsetPlugged)
+
+
     }
+
 
     /**
      * Registriert einen Broadcast-Receiver für Headset-Ereignisse.
@@ -159,7 +182,8 @@ class AudioPlayer {
 
     /**
      * Wird aufgerufen, wenn sich der Headset-Status ändert.
-     * Bei angeschlossenen Kopfhörern: Audio läuft über Kopfhörer (Lautsprecher aus).
+     * Bei angeschlossenen Kopfhörern: Audio läuft über Kopfhörer (Lautsprecher aus),
+     * es sei denn der Benutzer hat den Lautsprecher manuell eingeschaltet.
      * Bei abgezogenen Kopfhörern: Zurück zum vorherigen Lautsprecher-Status.
      */
     private fun onHeadsetStateChanged(plugged: Boolean) {
@@ -168,18 +192,18 @@ class AudioPlayer {
         isHeadsetPlugged = plugged
         Log.d(TAG, "🎧 Headset state changed: plugged=$plugged, isSpeakerOn=$isSpeakerOn")
 
-        if (plugged) {
-            // Kopfhörer angeschlossen → Audio läuft automatisch über Kopfhörer
-            // MODE_IN_COMMUNICATION ist wichtig für Bluetooth-Headset-Mikrofon
+        if (plugged && !isSpeakerOn) {
+            // Kopfhörer angeschlossen, Lautsprecher AUS → Audio über Kopfhörer
             audioManager?.mode = AudioManager.MODE_IN_COMMUNICATION
-            // isSpeakerphoneOn muss auf false, damit der Ton NUR über Kopfhörer kommt
             audioManager?.isSpeakerphoneOn = false
-            // Bluetooth SCO starten für Headset-Mikrofon
             startBluetoothSco()
             if (isBluetoothScoStarted) {
                 audioManager?.isBluetoothScoOn = true
             }
             Log.d(TAG, "🎧 Headphones detected: routing audio through headphones")
+        } else if (plugged && isSpeakerOn) {
+            // Kopfhörer angeschlossen, aber Lautsprecher war AN → bleibt über Lautsprecher
+            Log.d(TAG, "🎧 Headphones detected but speaker was ON, keeping speaker routing")
         } else {
             // Kopfhörer entfernt → Bluetooth SCO stoppen
             stopBluetoothSco()
@@ -188,7 +212,12 @@ class AudioPlayer {
             audioManager?.mode = if (isSpeakerOn) AudioManager.MODE_NORMAL else AudioManager.MODE_IN_COMMUNICATION
             Log.d(TAG, "🎧 Headphones removed: restoring speaker mode (isSpeakerOn=$isSpeakerOn)")
         }
+
+        // Callback benachrichtigen, damit das ViewModel die UI aktualisieren kann
+        onHeadsetStateChangeCallback?.invoke(plugged)
     }
+
+
 
     /**
      * Gibt zurück, ob Kopfhörer angeschlossen sind.
@@ -328,27 +357,34 @@ class AudioPlayer {
 
     /**
      * Wendet das korrekte Audio-Routing an.
-     * - Wenn Kopfhörer angeschlossen sind: Audio läuft über Kopfhörer (Lautsprecher aus)
+     * - Wenn Kopfhörer angeschlossen sind und Lautsprecher AUS: Audio über Kopfhörer
+     * - Wenn Kopfhörer angeschlossen sind und Lautsprecher AN: Audio über Telefon-Lautsprecher
      * - Wenn keine Kopfhörer: Verwendet die Benutzer-Einstellung (Lautsprecher an/aus)
      */
     private fun applyAudioRouting() {
-        if (isHeadsetPlugged) {
-            // Kopfhörer haben immer Vorrang
-            // MODE_IN_COMMUNICATION ist wichtig für Bluetooth-Headset-Mikrofon
+        if (isHeadsetPlugged && !isSpeakerOn) {
+            // Kopfhörer angeschlossen, Lautsprecher AUS → Audio über Kopfhörer
             audioManager?.mode = AudioManager.MODE_IN_COMMUNICATION
             audioManager?.isSpeakerphoneOn = false
-            // Bluetooth SCO aktivieren für Headset-Mikrofon
             startBluetoothSco()
             if (isBluetoothScoStarted) {
                 audioManager?.isBluetoothScoOn = true
             }
-            Log.d(TAG, "   Audio routing: headphones (speaker forced off, sco=$isBluetoothScoStarted)")
+            Log.d(TAG, "   Audio routing: headphones (speaker off, sco=$isBluetoothScoStarted)")
+        } else if (isHeadsetPlugged && isSpeakerOn) {
+            // Kopfhörer angeschlossen, aber Lautsprecher AN → Audio über Telefon-Lautsprecher
+            stopBluetoothSco()
+            audioManager?.isBluetoothScoOn = false
+            audioManager?.isSpeakerphoneOn = true
+            audioManager?.mode = AudioManager.MODE_NORMAL
+            Log.d(TAG, "   Audio routing: headphones plugged but speaker FORCED ON")
         } else {
             audioManager?.isSpeakerphoneOn = isSpeakerOn
             audioManager?.mode = if (isSpeakerOn) AudioManager.MODE_NORMAL else AudioManager.MODE_IN_COMMUNICATION
             Log.d(TAG, "   Audio routing: speaker=$isSpeakerOn")
         }
     }
+
 
     /**
      * Pausiert die Wiedergabe (bei transientem Fokus-Verlust).
@@ -378,15 +414,26 @@ class AudioPlayer {
 
     /**
      * Verbindet den AudioPlayer mit dem WebSocket, um eingehende Audio-Daten zu empfangen.
+     * Unterstützt sowohl Base64- als auch binäre Audio-Frames.
      */
     fun connectToWebSocket(webSocketClient: WalkieWebSocketClient) {
         Log.d(TAG, "🔗 connectToWebSocket()")
+        
+        // Binäre Audio-Daten (bevorzugt - schneller und kleiner)
+        webSocketClient.onBinaryAudioDataReceived = { username, pcmData ->
+            Log.d(TAG, "🎵 Binary audio received from '$username': ${pcmData.size} PCM bytes")
+            playAudioData(pcmData)
+        }
+        
+        // Fallback: Base64-kodierte Audio-Daten (für Kompatibilität)
         webSocketClient.onAudioDataReceived = { username, base64Data ->
             Log.d(TAG, "🎵 Audio received from '$username': ${base64Data.length} base64 chars")
             playBase64Audio(base64Data)
         }
-        Log.d(TAG, "✅ AudioPlayer connected to WebSocket")
+        
+        Log.d(TAG, "✅ AudioPlayer connected to WebSocket (binary + base64)")
     }
+
 
     /**
      * Dekodiert Base64-Audio-Daten und spielt sie ab.
@@ -504,8 +551,9 @@ class AudioPlayer {
         isSpeakerOn = on
         Log.d(TAG, "🔊 setSpeakerphoneOn: $on (headset=$isHeadsetPlugged)")
 
-        if (isHeadsetPlugged) {
-            // Kopfhörer sind angeschlossen → Lautsprecher bleibt aus, egal was der Benutzer will
+        if (isHeadsetPlugged && !on) {
+            // Kopfhörer sind angeschlossen UND Benutzer will Lautsprecher AUS
+            // → Audio über Kopfhörer ausgeben
             audioManager?.isSpeakerphoneOn = false
             audioManager?.mode = AudioManager.MODE_IN_COMMUNICATION
             // Bluetooth SCO aktivieren für Headset-Mikrofon
@@ -513,7 +561,15 @@ class AudioPlayer {
             if (isBluetoothScoStarted) {
                 audioManager?.isBluetoothScoOn = true
             }
-            Log.d(TAG, "   Headset plugged: keeping speaker OFF, audio through headphones (sco=$isBluetoothScoStarted)")
+            Log.d(TAG, "   Headset plugged, speaker OFF: audio through headphones (sco=$isBluetoothScoStarted)")
+        } else if (isHeadsetPlugged && on) {
+            // Kopfhörer sind angeschlossen, aber Benutzer WILL Lautsprecher AN
+            // → Bluetooth SCO stoppen und Audio über den Telefon-Lautsprecher ausgeben
+            stopBluetoothSco()
+            audioManager?.isBluetoothScoOn = false
+            audioManager?.isSpeakerphoneOn = true
+            audioManager?.mode = AudioManager.MODE_NORMAL
+            Log.d(TAG, "   Headset plugged, speaker FORCED ON: audio through phone speaker")
         } else {
             // Keine Kopfhörer → Benutzer-Einstellung anwenden
             audioManager?.isSpeakerphoneOn = on
@@ -521,6 +577,7 @@ class AudioPlayer {
             Log.d(TAG, "   AudioManager mode=${audioManager?.mode}, speakerphoneOn=${audioManager?.isSpeakerphoneOn}")
         }
     }
+
 
     /**
      * Gibt zurück, ob der Lautsprecher eingeschaltet ist.
