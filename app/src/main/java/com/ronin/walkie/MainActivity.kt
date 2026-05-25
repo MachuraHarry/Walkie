@@ -298,8 +298,16 @@ fun WalkieApp(
                         channelViewModel.joinChannel(channel)
                         currentScreen = "talk"
                     },
-                    onCreateChannel = { name, description, color ->
-                        channelListViewModel.createChannel(name, description, color)
+                    onChannelClickWithPassword = { channel, password ->
+                        currentChannel = channel
+                        channelViewModel.joinChannel(channel, password)
+                        currentScreen = "talk"
+                    },
+                    onCreateChannel = { name, description, color, password ->
+                        channelListViewModel.createChannel(name, description, color, password)
+                    },
+                    onDeleteChannel = { channel ->
+                        channelListViewModel.deleteChannel(channel.id)
                     },
                     onRefresh = { channelListViewModel.loadChannels() },
                     onClearError = { channelListViewModel.clearError() },

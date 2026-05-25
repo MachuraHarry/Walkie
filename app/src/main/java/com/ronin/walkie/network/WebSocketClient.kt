@@ -432,18 +432,31 @@ class WalkieWebSocketClient(
         sendMessage("get_channels")
     }
 
-    fun createChannel(name: String, description: String = "", color: String = "#4CAF50") {
-        Log.d(TAG, "📢 createChannel: name='$name'")
-        sendMessage("create_channel", mapOf(
+    fun createChannel(name: String, description: String = "", color: String = "#4CAF50", password: String = "") {
+        Log.d(TAG, "📢 createChannel: name='$name', hasPassword=${password.isNotEmpty()}")
+        val payload = mutableMapOf(
             "name" to name,
             "description" to description,
             "color" to color
-        ))
+        )
+        if (password.isNotEmpty()) {
+            payload["password"] = password
+        }
+        sendMessage("create_channel", payload)
     }
 
-    fun joinChannel(channelId: Int) {
-        Log.d(TAG, "🚪 joinChannel($channelId)")
-        sendMessage("join_channel", mapOf("channelId" to channelId))
+    fun deleteChannel(channelId: Int) {
+        Log.d(TAG, "🗑️ deleteChannel($channelId)")
+        sendMessage("delete_channel", mapOf("channelId" to channelId))
+    }
+
+    fun joinChannel(channelId: Int, password: String = "") {
+        Log.d(TAG, "🚪 joinChannel($channelId, hasPassword=${password.isNotEmpty()})")
+        val payload = mutableMapOf("channelId" to channelId)
+        if (password.isNotEmpty()) {
+            payload["password"] = password
+        }
+        sendMessage("join_channel", payload)
     }
 
     fun leaveChannel(channelId: Int) {

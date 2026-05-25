@@ -76,13 +76,6 @@ class ChannelListViewModel(
                     error = null
                 )
                 // Automatisch Channels laden wenn verbunden
-                // Wichtig: Nach einem Reconnect müssen wir uns neu einloggen,
-                // da der Server den Client aus der clients-Map entfernt hat.
-                // Das Login wird automatisch über den onReconnected-Callback
-                // im LoginViewModel durchgeführt. Nach erfolgreichem Login
-                // erhalten wir ein "login_success" und können dann Channels laden.
-                // ABER: Wenn wir bereits eingeloggt waren (isLoggedIn war true),
-                // müssen wir warten, bis der Re-Login abgeschlossen ist.
                 val currentUsername = _uiState.value.currentUsername
                 if (currentUsername.isNotEmpty()) {
                     Log.d(TAG, "   User was logged in, re-logging in after reconnect...")
@@ -119,6 +112,17 @@ class ChannelListViewModel(
             "channel_created" -> {
                 Log.d(TAG, "📢 Received channel_created, reloading channels")
                 forceLoadChannels()
+            }
+            "channel_deleted" -> {
+                Log.d(TAG, "🗑️ Received channel_deleted, reloading channels")
+                forceLoadChannels()
+            }
+            "join_channel_error" -> {
+                val errorMsg = message.payload?.get("message") as? String ?: "Wrong password"
+                Log.e(TAG, "❌ Join channel error: $errorMsg")
+                _uiState.value = _uiState.value.copy(
+                    error = errorMsg
+                )
             }
             "error" -> {
                 val errorMsg = message.payload?.get("message") as? String ?: "Ein Fehler ist aufgetreten"
@@ -176,8 +180,8 @@ class ChannelListViewModel(
         }
     }
 
-    fun createChannel(name: String, description: String = "", color: String = "#4CAF50") {
-        Log.d(TAG, "📢 createChannel: name='$name'")
+    fun createChannel(name: String, description: String = "", color: String = "#4CAF50", password: String = "") {
+        Log.d(TAG, "📢 createChannel: name='$name', hasPassword=${password.isNotEmpty()}")
         if (name.length < 2) {
             Log.w(TAG, "   Channel name too short")
             _uiState.value = _uiState.value.copy(
@@ -194,11 +198,23 @@ class ChannelListViewModel(
             return
         }
 
-        webSocketClient.createChannel(name, description, color)
+        webSocketClient.createChannel(name, description, color, password)
     }
 
-    fun joinChannel(channelId: Int) {
-        Log.d(TAG, "🚪 joinChannel($channelId)")
+    fun deleteChannel(channelId: Int) {
+        Log.d(TAG, "🗑️ deleteChannel($channelId)")
+        if (!webSocketClient.isConnected) {
+            Log.w(TAG, "   Not connected, cannot delete channel")
+            _uiState.value = _uiState.value.copy(
+                error = "Keine Verbindung zum Server"
+            )
+            return
+        }
+        webSocketClient.deleteChannel(channelId)
+    }
+
+    fun joinChannel(channelId: Int, password: String = "") {
+        Log.d(TAG, "🚪 joinChannel($channelId, hasPassword=${password.isNotEmpty()})")
         if (!webSocketClient.isConnected) {
             Log.w(TAG, "   Not connected, cannot join channel")
             _uiState.value = _uiState.value.copy(
@@ -206,7 +222,7 @@ class ChannelListViewModel(
             )
             return
         }
-        webSocketClient.joinChannel(channelId)
+        webSocketClient.joinChannel(channelId, password)
     }
 
     fun setUsername(username: String) {

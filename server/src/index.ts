@@ -3,6 +3,9 @@ import cors from 'cors';
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { config } from './config';
+import Database from 'better-sqlite3';
+import crypto from 'crypto';
+import path from 'path';
 
 // ============================================================
 // DEBUG: Globaler Debug-Modus
@@ -18,7 +21,28 @@ function debugLog(tag: string, msg: string, data?: any): void {
 }
 
 // ============================================================
-// In-Memory Channel & User Management (keine Datenbank nötig)
+// SQLite Datenbank (persistente Channel-Speicherung)
+// ============================================================
+
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'walkie.db');
+const db = new Database(DB_PATH);
+db.pragma('journal_mode = WAL');
+
+// Channels-Tabelle erstellen (falls nicht vorhanden)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS channels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    color TEXT DEFAULT '#4CAF50',
+    password_hash TEXT DEFAULT '',
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )
+`);
+
+// ============================================================
+// In-Memory Channel & User Management
 // ============================================================
 
 interface Channel {
@@ -26,8 +50,9 @@ interface Channel {
   name: string;
   description: string;
   color: string;
-  createdBy: string;
-  createdAt: Date;
+  password_hash: string;
+  created_by: string;
+  created_at: string;
   members: Set<string>;
 }
 
@@ -39,13 +64,37 @@ interface ClientInfo {
   connectedAt: Date;
 }
 
-let nextChannelId = 1;
 const channels = new Map<number, Channel>();
 const clients = new Map<WebSocket, ClientInfo>();
+
+// Channels aus der Datenbank laden
+function loadChannelsFromDb(): void {
+  const rows = db.prepare('SELECT * FROM channels ORDER BY id ASC').all() as any[];
+  channels.clear();
+  for (const row of rows) {
+    channels.set(row.id, {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      color: row.color,
+      password_hash: row.password_hash,
+      created_by: row.created_by,
+      created_at: row.created_at,
+      members: new Set(),
+    });
+  }
+  debugLog('DB', `Loaded ${channels.size} channels from database`);
+}
+
+loadChannelsFromDb();
 
 // ============================================================
 // Hilfsfunktionen
 // ============================================================
+
+function hashPassword(password: string): string {
+  return crypto.createHash('sha256').update(password).digest('hex');
+}
 
 function sendToClient(ws: WebSocket, message: any): void {
   const json = JSON.stringify(message);
@@ -88,10 +137,11 @@ function getChannelList(): any[] {
     name: ch.name,
     description: ch.description,
     color: ch.color,
-    created_by: ch.createdBy,
-    created_at: ch.createdAt.toISOString(),
+    created_by: ch.created_by,
+    created_at: ch.created_at,
     is_active: true,
     member_count: ch.members.size,
+    has_password: ch.password_hash.length > 0,
   }));
 }
 
@@ -162,7 +212,6 @@ wss.on('connection', (ws, req) => {
 
 
 
-
   ws.on('close', (code, reason) => {
     debugLog('WS', `🔌 Connection closed: code=${code}, reason=${reason?.toString() || 'none'}`);
     handleDisconnect(ws);
@@ -223,6 +272,9 @@ function handleMessage(ws: WebSocket, message: { type: string; payload?: any }):
       break;
     case 'create_channel':
       handleCreateChannel(ws, payload);
+      break;
+    case 'delete_channel':
+      handleDeleteChannel(ws, payload);
       break;
     case 'join_channel':
       handleJoinChannel(ws, payload);
@@ -316,7 +368,7 @@ function handleGetChannels(ws: WebSocket): void {
   sendToClient(ws, { type: 'channel_list', payload: { channels: channelList } });
 }
 
-function handleCreateChannel(ws: WebSocket, payload: { name: string; description?: string; color?: string }): void {
+function handleCreateChannel(ws: WebSocket, payload: { name: string; description?: string; color?: string; password?: string }): void {
   const info = clients.get(ws);
   if (!info) {
     debugLog('CREATE', '❌ Not logged in');
@@ -324,8 +376,8 @@ function handleCreateChannel(ws: WebSocket, payload: { name: string; description
     return;
   }
 
-  const { name, description = '', color = '#4CAF50' } = payload;
-  debugLog('CREATE', `User "${info.username}" creating channel: name="${name}"`);
+  const { name, description = '', color = '#4CAF50', password = '' } = payload;
+  debugLog('CREATE', `User "${info.username}" creating channel: name="${name}", hasPassword=${password.length > 0}`);
 
   if (!name || name.length < 2) {
     debugLog('CREATE', '❌ Channel name too short');
@@ -333,15 +385,23 @@ function handleCreateChannel(ws: WebSocket, payload: { name: string; description
     return;
   }
 
-  const id = nextChannelId++;
+  const now = new Date().toISOString();
+  const password_hash = password ? hashPassword(password) : '';
+
+  // In SQLite speichern
+  const stmt = db.prepare('INSERT INTO channels (name, description, color, password_hash, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)');
+  const result = stmt.run(name, description, color, password_hash, info.username, now);
+  const id = result.lastInsertRowid as number;
+
   const channel: Channel = {
     id,
     name,
     description,
     color,
-    createdBy: info.username,
-    createdAt: new Date(),
-    members: new Set([info.username]),
+    password_hash,
+    created_by: info.username,
+    created_at: now,
+    members: new Set(),
   };
 
   channels.set(id, channel);
@@ -361,7 +421,64 @@ function handleCreateChannel(ws: WebSocket, payload: { name: string; description
   }
 }
 
-function handleJoinChannel(ws: WebSocket, payload: { channelId: number }): void {
+function handleDeleteChannel(ws: WebSocket, payload: { channelId: number }): void {
+  const info = clients.get(ws);
+  if (!info) {
+    debugLog('DELETE', '❌ Not logged in');
+    sendToClient(ws, { type: 'error', payload: { message: 'Not logged in' } });
+    return;
+  }
+
+  const channel = channels.get(payload.channelId);
+  if (!channel) {
+    debugLog('DELETE', `❌ Channel #${payload.channelId} not found`);
+    sendToClient(ws, { type: 'error', payload: { message: 'Channel not found' } });
+    return;
+  }
+
+  // Nur der Ersteller darf den Channel löschen
+  if (channel.created_by !== info.username) {
+    debugLog('DELETE', `❌ User "${info.username}" is not the owner of channel #${payload.channelId} (owner: "${channel.created_by}")`);
+    sendToClient(ws, { type: 'error', payload: { message: 'Only the channel creator can delete this channel' } });
+    return;
+  }
+
+  debugLog('DELETE', `🗑️ User "${info.username}" deleting channel #${payload.channelId} ("${channel.name}")`);
+
+  // Aus SQLite löschen
+  db.prepare('DELETE FROM channels WHERE id = ?').run(payload.channelId);
+
+  // Alle Mitglieder benachrichtigen, dass sie aus dem Channel entfernt wurden
+  for (const memberName of channel.members) {
+    for (const [clientWs, clientInfo] of clients) {
+      if (clientInfo.username === memberName) {
+        if (clientInfo.channelId === payload.channelId) {
+          clientInfo.channelId = null;
+        }
+        sendToClient(clientWs, {
+          type: 'channel_deleted',
+          payload: { channelId: payload.channelId }
+        });
+      }
+    }
+  }
+
+  // Aus dem In-Memory-Map entfernen
+  channels.delete(payload.channelId);
+
+  debugLog('DELETE', `✅ Channel #${payload.channelId} deleted. Total channels: ${channels.size}`);
+
+  // Aktualisierte Channel-Liste an alle senden
+  const channelList = getChannelList();
+  for (const [clientWs] of clients) {
+    sendToClient(clientWs, {
+      type: 'channel_list',
+      payload: { channels: channelList }
+    });
+  }
+}
+
+function handleJoinChannel(ws: WebSocket, payload: { channelId: number; password?: string }): void {
   const info = clients.get(ws);
   if (!info) {
     debugLog('JOIN', '❌ Not logged in');
@@ -376,6 +493,18 @@ function handleJoinChannel(ws: WebSocket, payload: { channelId: number }): void 
     debugLog('JOIN', `❌ Channel #${payload.channelId} not found`);
     sendToClient(ws, { type: 'error', payload: { message: 'Channel not found' } });
     return;
+  }
+
+  // Passwort-Prüfung
+  if (channel.password_hash) {
+    const providedPassword = payload.password || '';
+    const providedHash = hashPassword(providedPassword);
+    if (providedHash !== channel.password_hash) {
+      debugLog('JOIN', `❌ Wrong password for channel #${payload.channelId}`);
+      sendToClient(ws, { type: 'join_channel_error', payload: { message: 'Wrong password' } });
+      return;
+    }
+    debugLog('JOIN', `✅ Password correct for channel #${payload.channelId}`);
   }
 
   channel.members.add(info.username);
@@ -472,14 +601,6 @@ function handleStopTalking(ws: WebSocket, payload: { channelId: number }): void 
 
 /**
  * Binäres Audio-Frame-Format:
- * 
- * [1 Byte Channel-ID Länge][Channel-ID UTF-8][1 Byte Username Länge][Username UTF-8][PCM-Daten]
- * 
- * Vereinfachte Variante: Wir senden zuerst einen JSON-Header (Text-Frame),
- * dann die Binär-Daten (Binary-Frame). Der Client erwartet nach einem
- * "audio_meta"-Text-Frame den nächsten Binary-Frame als Audio-Daten.
- * 
- * Noch einfacher (und besser): Wir packen alles in ein Binary-Frame:
  * 
  * Byte 0-3:   Channel-ID (Int32, Little-Endian)
  * Byte 4-7:   Username-Länge (Int32, Little-Endian)
@@ -599,10 +720,11 @@ function broadcastBinaryAudio(channelId: number, binaryData: Buffer, excludeWs?:
 server.listen(config.port, '0.0.0.0', () => {
   console.log(`
 ╔══════════════════════════════════════════╗
-║        Walkie Talkie Server v2.1         ║
+║        Walkie Talkie Server v2.2         ║
 ║──────────────────────────────────────────║
 ║  WebSocket: ws://0.0.0.0:${config.port}         ║
 ║  Health:    http://0.0.0.0:${config.port}/health ║
+║  Database:  SQLite (${DB_PATH})  ║
 ║  Mode:      Audio Relay (kein WebRTC)    ║
 ║  Ping:      10s interval, 30s timeout    ║
 ║  DEBUG:     ENABLED                      ║

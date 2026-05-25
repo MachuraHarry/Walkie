@@ -18,6 +18,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ronin.walkie.R
@@ -30,19 +32,166 @@ fun ChannelListScreen(
     uiState: ChannelListUiState,
     username: String,
     onChannelClick: (Channel) -> Unit,
-    onCreateChannel: (String, String, String) -> Unit,
+    onChannelClickWithPassword: (Channel, String) -> Unit,
+    onCreateChannel: (String, String, String, String) -> Unit,
+    onDeleteChannel: (Channel) -> Unit,
     onRefresh: () -> Unit,
     onClearError: () -> Unit,
     onSettingsClick: () -> Unit = {}
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
+    var showPasswordDialog by remember { mutableStateOf<Channel?>(null) }
+    var showDeleteConfirmDialog by remember { mutableStateOf<Channel?>(null) }
+    var joinPassword by remember { mutableStateOf("") }
+    var showJoinPassword by remember { mutableStateOf(false) }
+    var joinPasswordError by remember { mutableStateOf(false) }
 
+    // Create Channel Dialog
     if (showCreateDialog) {
         CreateChannelDialog(
             onDismiss = { showCreateDialog = false },
-            onCreate = { name, description, color ->
-                onCreateChannel(name, description, color)
+            onCreate = { name, description, color, password ->
+                onCreateChannel(name, description, color, password)
                 showCreateDialog = false
+            }
+        )
+    }
+
+    // Password Dialog for joining password-protected channels
+    showPasswordDialog?.let { channel ->
+        AlertDialog(
+            onDismissRequest = {
+                showPasswordDialog = null
+                joinPassword = ""
+                joinPasswordError = false
+            },
+            shape = RoundedCornerShape(24.dp),
+            icon = {
+                Icon(
+                    Icons.Default.Lock,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    stringResource(R.string.channel_password_required_title),
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        stringResource(R.string.channel_password_required_desc, channel.name),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = joinPassword,
+                        onValueChange = {
+                            joinPassword = it
+                            joinPasswordError = false
+                        },
+                        label = { Text(stringResource(R.string.channel_password)) },
+                        singleLine = true,
+                        isError = joinPasswordError,
+                        supportingText = if (joinPasswordError) {
+                            { Text(stringResource(R.string.wrong_password)) }
+                        } else null,
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Lock,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = { showJoinPassword = !showJoinPassword }) {
+                                Icon(
+                                    if (showJoinPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        },
+                        visualTransformation = if (showJoinPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (joinPassword.isNotEmpty()) {
+                            onChannelClickWithPassword(channel, joinPassword)
+                            showPasswordDialog = null
+                            joinPassword = ""
+                        } else {
+                            joinPasswordError = true
+                        }
+                    },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(stringResource(R.string.join))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showPasswordDialog = null
+                    joinPassword = ""
+                    joinPasswordError = false
+                }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
+    // Delete Confirmation Dialog
+    showDeleteConfirmDialog?.let { channel ->
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = null },
+            shape = RoundedCornerShape(24.dp),
+            icon = {
+                Icon(
+                    Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    stringResource(R.string.delete_channel_title),
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    stringResource(R.string.delete_channel_confirm, channel.name),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDeleteChannel(channel)
+                        showDeleteConfirmDialog = null
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text(stringResource(R.string.delete))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
             }
         )
     }
@@ -235,7 +384,17 @@ fun ChannelListScreen(
                     items(uiState.channels) { channel ->
                         ChannelCard(
                             channel = channel,
-                            onClick = { onChannelClick(channel) }
+                            currentUsername = username,
+                            onClick = {
+                                if (channel.has_password) {
+                                    showPasswordDialog = channel
+                                } else {
+                                    onChannelClick(channel)
+                                }
+                            },
+                            onDeleteClick = {
+                                showDeleteConfirmDialog = channel
+                            }
                         )
                     }
                 }
@@ -247,8 +406,12 @@ fun ChannelListScreen(
 @Composable
 fun ChannelCard(
     channel: Channel,
-    onClick: () -> Unit
+    currentUsername: String,
+    onClick: () -> Unit,
+    onDeleteClick: () -> Unit
 ) {
+    val isOwner = channel.created_by == currentUsername
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -290,11 +453,22 @@ fun ChannelCard(
             Spacer(modifier = Modifier.width(16.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = channel.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = channel.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    if (channel.has_password) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Icon(
+                            Icons.Default.Lock,
+                            contentDescription = stringResource(R.string.password_protected),
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
+                }
                 if (channel.description.isNotEmpty()) {
                     Text(
                         text = channel.description,
@@ -302,6 +476,28 @@ fun ChannelCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (isOwner) {
+                    Text(
+                        text = stringResource(R.string.created_by_you),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                    )
+                }
+            }
+
+            // Delete button (only for channel owner)
+            if (isOwner) {
+                IconButton(
+                    onClick = onDeleteClick,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = stringResource(R.string.delete_channel),
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }

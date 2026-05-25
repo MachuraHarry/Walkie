@@ -135,6 +135,24 @@
     <string name="easy">Leicht</string>
     <string name="hard">Schwer</string>
 
+    <!-- Channel Password -->
+    <string name="channel_password_optional">Passwort (optional)</string>
+    <string name="channel_password_placeholder">Channel-Passwort eingeben</string>
+    <string name="channel_password">Passwort</string>
+    <string name="channel_password_required_title">Passwort erforderlich</string>
+    <string name="channel_password_required_desc">Dieser Channel ist passwortgeschützt. Bitte gib das Passwort ein, um %s beizutreten.</string>
+    <string name="wrong_password">Falsches Passwort</string>
+    <string name="password_protected">Passwortgeschützt</string>
+    <string name="show_password">Passwort anzeigen</string>
+    <string name="hide_password">Passwort verbergen</string>
+
+    <!-- Delete Channel -->
+    <string name="delete_channel">Channel löschen</string>
+    <string name="delete_channel_title">Channel löschen?</string>
+    <string name="delete_channel_confirm">Bist du sicher, dass du den Channel \"%s\" löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden.</string>
+    <string name="delete">Löschen</string>
+    <string name="created_by_you">Von dir erstellt</string>
+
     <!-- Language -->
     <string name="language_section">Sprache</string>
     <string name="language">Sprache</string>

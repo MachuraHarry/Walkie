@@ -4,24 +4,33 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.ronin.walkie.R
 
 @Composable
 fun CreateChannelDialog(
     onDismiss: () -> Unit,
-    onCreate: (name: String, description: String, color: String) -> Unit
+    onCreate: (name: String, description: String, color: String, password: String) -> Unit
 ) {
     var channelName by remember { mutableStateOf("") }
     var channelDescription by remember { mutableStateOf("") }
     var selectedColor by remember { mutableStateOf("#4CAF50") }
+    var channelPassword by remember { mutableStateOf("") }
+    var showPassword by remember { mutableStateOf(false) }
     var isError by remember { mutableStateOf(false) }
 
     val colors = listOf(
@@ -73,6 +82,36 @@ fun CreateChannelDialog(
                     shape = RoundedCornerShape(12.dp)
                 )
 
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Passwort-Feld (optional)
+                OutlinedTextField(
+                    value = channelPassword,
+                    onValueChange = { channelPassword = it },
+                    label = { Text(stringResource(R.string.channel_password_optional)) },
+                    placeholder = { Text(stringResource(R.string.channel_password_placeholder)) },
+                    singleLine = true,
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Lock,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = { showPassword = !showPassword }) {
+                            Icon(
+                                if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = if (showPassword) stringResource(R.string.hide_password) else stringResource(R.string.show_password),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    },
+                    visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
@@ -116,7 +155,7 @@ fun CreateChannelDialog(
             Button(
                 onClick = {
                     if (channelName.length >= 2) {
-                        onCreate(channelName, channelDescription, selectedColor)
+                        onCreate(channelName, channelDescription, selectedColor, channelPassword)
                     } else {
                         isError = true
                     }

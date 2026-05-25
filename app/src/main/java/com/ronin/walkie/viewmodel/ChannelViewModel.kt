@@ -252,8 +252,8 @@ class ChannelViewModel(
 
 
 
-    fun joinChannel(channel: Channel) {
-        Log.d(TAG, "🚪 joinChannel: #${channel.id} '${channel.name}'")
+    fun joinChannel(channel: Channel, password: String = "") {
+        Log.d(TAG, "🚪 joinChannel: #${channel.id} '${channel.name}', hasPassword=${password.isNotEmpty()}")
         Log.d(TAG, "   webSocketClient.isConnected=${webSocketClient.isConnected}")
 
         // Verbindungsstatus vom WebSocket übernehmen (der ist noch verbunden)
@@ -272,7 +272,7 @@ class ChannelViewModel(
         audioRecorder.setChannelId(channel.id)
         audioPlayer.connectToWebSocket(webSocketClient)
         audioPlayer.startPlayback()
-        webSocketClient.joinChannel(channel.id)
+        webSocketClient.joinChannel(channel.id, password)
 
         // Headset-Callback registrieren für sofortige UI-Updates
         registerHeadsetCallback()
