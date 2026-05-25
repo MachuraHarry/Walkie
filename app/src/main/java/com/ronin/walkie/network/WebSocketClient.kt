@@ -84,10 +84,9 @@ class WalkieWebSocketClient(
 
     fun isConnecting(): Boolean {
         // Nach einem onClose() ist readyState == CLOSED, aber wir sind im Reconnect.
-        // Daher prüfen wir zusätzlich _isReconnecting und ob der readyState auf Connecting ist.
-        val state = _isReconnecting ||
-                    readyState == ReadyState.NOT_YET_CONNECTED ||
-                    readyState == ReadyState.CONNECTING
+        // Daher prüfen wir zusätzlich _isReconnecting.
+        // ReadyState enum in Java-WebSocket 1.5.7 hat nur: NOT_YET_CONNECTED, OPEN, CLOSING, CLOSED
+        val state = _isReconnecting || readyState == ReadyState.NOT_YET_CONNECTED
         Log.d(TAG, "🔍 isConnecting() = $state (readyState=$readyState, _isReconnecting=$_isReconnecting, _hasConnectedEver=$_hasConnectedEver)")
         return state
     }
