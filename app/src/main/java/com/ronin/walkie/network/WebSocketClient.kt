@@ -42,6 +42,9 @@ class WalkieWebSocketClient(
     }
 
 
+    // Callback für erfolgreiche Reconnects (wird vom LoginViewModel gesetzt)
+    var onReconnected: (() -> Unit)? = null
+
     init {
         Log.d(TAG, "🏗️ WalkieWebSocketClient created with URL: $serverUrl")
         connectionLostTimeout = CONNECTION_LOST_TIMEOUT_MS / 1000
@@ -62,6 +65,9 @@ class WalkieWebSocketClient(
     private var connectionTimeoutJob: Job? = null
     private var scope: CoroutineScope? = null
 
+    // Der zuletzt eingeloggte Username (für Auto-Re-Login nach Reconnect)
+    private var lastUsername: String = ""
+
     // Message-Queue für Nachrichten, die während der Trennung gesendet werden
     private val pendingMessages = mutableListOf<Pair<String, Any?>>()
 
@@ -77,7 +83,11 @@ class WalkieWebSocketClient(
 
 
     fun isConnecting(): Boolean {
-        val state = (_hasConnectedEver && readyState == ReadyState.NOT_YET_CONNECTED) || _isReconnecting
+        // Nach einem onClose() ist readyState == CLOSED, aber wir sind im Reconnect.
+        // Daher prüfen wir zusätzlich _isReconnecting und ob der readyState auf Connecting ist.
+        val state = _isReconnecting ||
+                    readyState == ReadyState.NOT_YET_CONNECTED ||
+                    readyState == ReadyState.CONNECTING
         Log.d(TAG, "🔍 isConnecting() = $state (readyState=$readyState, _isReconnecting=$_isReconnecting, _hasConnectedEver=$_hasConnectedEver)")
         return state
     }
@@ -94,6 +104,12 @@ class WalkieWebSocketClient(
 
         // Ausstehende Nachrichten senden
         flushPendingMessages()
+
+        // Callback für erfolgreichen Reconnect auslösen (z.B. Auto-Re-Login)
+        onReconnected?.let { callback ->
+            Log.d(TAG, "   Invoking onReconnected callback")
+            callback()
+        }
     }
 
     override fun onMessage(message: String) {
@@ -216,10 +232,18 @@ class WalkieWebSocketClient(
 
     /**
      * Startet Connection-Timeout: Wenn nach 10s keine Verbindung steht, abbrechen.
+     * Verwendet einen dedizierten Scope, der bei close() gecancelled wird.
      */
     private fun startConnectionTimeout() {
         cancelConnectionTimeout()
-        connectionTimeoutJob = CoroutineScope(Dispatchers.IO).launch {
+        connectionTimeoutJob = scope?.launch(Dispatchers.IO) {
+            delay(CONNECTION_TIMEOUT_MS)
+            if (!_isConnected && !_isReconnecting) {
+                Log.w(TAG, "⏰ Connection timeout after ${CONNECTION_TIMEOUT_MS}ms, closing...")
+                _messages.tryEmit(ServerMessage("error", mapOf("message" to "Connection timeout")))
+                close()
+            }
+        } ?: CoroutineScope(Dispatchers.IO).launch {
             delay(CONNECTION_TIMEOUT_MS)
             if (!_isConnected && !_isReconnecting) {
                 Log.w(TAG, "⏰ Connection timeout after ${CONNECTION_TIMEOUT_MS}ms, closing...")
@@ -236,6 +260,10 @@ class WalkieWebSocketClient(
 
     /**
      * Verbesserter Reconnect mit Exponential Backoff und maximalen Versuchen.
+     * 
+     * WICHTIG: Wir verwenden connect() statt reconnect(), weil die java-websocket
+     * Bibliothek nach einem onClose() intern in einem inkonsistenten Zustand sein kann.
+     * connect() erstellt einen komplett neuen Verbindungsversuch.
      */
     private fun scheduleReconnect() {
         Log.d(TAG, "🔄 scheduleReconnect() called (_isReconnecting=$_isReconnecting, attempt=${reconnectAttempts + 1}/$MAX_RECONNECT_ATTEMPTS)")
@@ -270,9 +298,13 @@ class WalkieWebSocketClient(
             Log.d(TAG, "🔄🔄🔄 Reconnect attempt $reconnectAttempts starting...")
             Log.d(TAG, "   isConnected=$isConnected, isConnecting=${isConnecting()}")
             if (!isConnected && !isConnecting()) {
-                Log.d(TAG, "   -> Calling reconnect()")
-                reconnect()
-                Log.d(TAG, "   -> reconnect() returned")
+                Log.d(TAG, "   -> Calling connect() (instead of reconnect() for reliability)")
+                // WICHTIG: connect() statt reconnect() verwenden!
+                // reconnect() der java-websocket Bibliothek kann nach einem onClose()
+                // fehlschlagen, weil der interne Zustand nicht korrekt zurückgesetzt wird.
+                // connect() erstellt einen komplett neuen Verbindungsversuch.
+                connect()
+                Log.d(TAG, "   -> connect() returned")
             } else {
                 Log.d(TAG, "   -> Already connected or connecting, skipping reconnect")
                 _isReconnecting = false

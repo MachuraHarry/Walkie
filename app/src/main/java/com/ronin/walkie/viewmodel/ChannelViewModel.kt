@@ -138,6 +138,17 @@ class ChannelViewModel(
                     error = null
                 )
                 missedPongs = 0
+
+                // Nach einem Reconnect: Channel automatisch wieder joinen
+                val currentChannel = _uiState.value.channel
+                if (currentChannel != null) {
+                    Log.d(TAG, "🔄 Reconnected! Re-joining channel #${currentChannel.id} '${currentChannel.name}'")
+                    webSocketClient.joinChannel(currentChannel.id)
+                    // Audio-Playback neu starten falls nötig
+                    if (!audioPlayer.isPlaying()) {
+                        audioPlayer.startPlayback()
+                    }
+                }
             }
             "disconnected" -> {
                 _uiState.value = _uiState.value.copy(

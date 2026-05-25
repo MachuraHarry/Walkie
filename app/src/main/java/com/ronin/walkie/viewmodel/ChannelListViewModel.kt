@@ -76,7 +76,21 @@ class ChannelListViewModel(
                     error = null
                 )
                 // Automatisch Channels laden wenn verbunden
-                loadChannels()
+                // Wichtig: Nach einem Reconnect müssen wir uns neu einloggen,
+                // da der Server den Client aus der clients-Map entfernt hat.
+                // Das Login wird automatisch über den onReconnected-Callback
+                // im LoginViewModel durchgeführt. Nach erfolgreichem Login
+                // erhalten wir ein "login_success" und können dann Channels laden.
+                // ABER: Wenn wir bereits eingeloggt waren (isLoggedIn war true),
+                // müssen wir warten, bis der Re-Login abgeschlossen ist.
+                val currentUsername = _uiState.value.currentUsername
+                if (currentUsername.isNotEmpty()) {
+                    Log.d(TAG, "   User was logged in, re-logging in after reconnect...")
+                    webSocketClient.login(currentUsername)
+                } else {
+                    Log.d(TAG, "   Not logged in yet, just loading channels")
+                    loadChannels()
+                }
             }
             "disconnected" -> {
                 Log.d(TAG, "🔌 WebSocket disconnected!")
@@ -84,6 +98,10 @@ class ChannelListViewModel(
                     isConnected = false,
                     isReconnecting = webSocketClient.isConnecting()
                 )
+            }
+            "login_success" -> {
+                Log.d(TAG, "✅ Re-login successful after reconnect! Loading channels...")
+                loadChannels()
             }
             "channel_list" -> {
                 Log.d(TAG, "📋 Received channel_list")

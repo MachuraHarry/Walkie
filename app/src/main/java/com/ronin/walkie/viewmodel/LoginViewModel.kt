@@ -64,6 +64,19 @@ class LoginViewModel(
         }
 
         observeMessages()
+
+        // Reconnect-Callback registrieren: Nach erfolgreichem Reconnect automatisch neu einloggen
+        webSocketClient.onReconnected = {
+            Log.d(TAG, "🔄 WebSocket reconnected! Auto-re-login with username: '${_uiState.value.username}'")
+            val username = _uiState.value.username
+            if (username.isNotEmpty()) {
+                // Kurz warten, bis der Server die "connected" Nachricht gesendet hat
+                viewModelScope.launch {
+                    delay(500)
+                    webSocketClient.login(username)
+                }
+            }
+        }
     }
 
     private fun observeMessages() {
