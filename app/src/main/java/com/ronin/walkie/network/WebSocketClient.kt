@@ -452,7 +452,7 @@ class WalkieWebSocketClient(
 
     fun joinChannel(channelId: Int, password: String = "") {
         Log.d(TAG, "🚪 joinChannel($channelId, hasPassword=${password.isNotEmpty()})")
-        val payload = mutableMapOf("channelId" to channelId)
+        val payload = mutableMapOf<String, Any>("channelId" to channelId)
         if (password.isNotEmpty()) {
             payload["password"] = password
         }
