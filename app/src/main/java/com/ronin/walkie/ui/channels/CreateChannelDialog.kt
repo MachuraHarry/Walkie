@@ -9,8 +9,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.ronin.walkie.R
 
 @Composable
 fun CreateChannelDialog(
@@ -23,12 +25,12 @@ fun CreateChannelDialog(
     var isError by remember { mutableStateOf(false) }
 
     val colors = listOf(
-        "#4CAF50" to "Grün",
-        "#2196F3" to "Blau",
-        "#FF5722" to "Orange",
-        "#9C27B0" to "Lila",
-        "#F44336" to "Rot",
-        "#FFC107" to "Gelb"
+        "#4CAF50" to stringResource(R.string.color_green),
+        "#2196F3" to stringResource(R.string.color_blue),
+        "#FF5722" to stringResource(R.string.color_orange),
+        "#9C27B0" to stringResource(R.string.color_purple),
+        "#F44336" to stringResource(R.string.color_red),
+        "#FFC107" to stringResource(R.string.color_yellow)
     )
 
     AlertDialog(
@@ -36,7 +38,7 @@ fun CreateChannelDialog(
         shape = RoundedCornerShape(24.dp),
         title = {
             Text(
-                "Channel erstellen",
+                stringResource(R.string.create_channel_title),
                 fontWeight = FontWeight.Bold
             )
         },
@@ -48,12 +50,12 @@ fun CreateChannelDialog(
                         channelName = it
                         isError = false
                     },
-                    label = { Text("Channel-Name") },
-                    placeholder = { Text("z.B. Allgemein") },
+                    label = { Text(stringResource(R.string.channel_name)) },
+                    placeholder = { Text(stringResource(R.string.channel_name_placeholder)) },
                     singleLine = true,
                     isError = isError,
                     supportingText = if (isError) {
-                        { Text("Name muss mindestens 2 Zeichen haben") }
+                        { Text(stringResource(R.string.name_min_length)) }
                     } else null,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
@@ -64,8 +66,8 @@ fun CreateChannelDialog(
                 OutlinedTextField(
                     value = channelDescription,
                     onValueChange = { channelDescription = it },
-                    label = { Text("Beschreibung (optional)") },
-                    placeholder = { Text("Wofür ist dieser Channel?") },
+                    label = { Text(stringResource(R.string.channel_description)) },
+                    placeholder = { Text(stringResource(R.string.channel_description_placeholder)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
@@ -74,7 +76,7 @@ fun CreateChannelDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    "Farbe",
+                    stringResource(R.string.color),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -122,12 +124,12 @@ fun CreateChannelDialog(
                 enabled = channelName.length >= 2,
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Erstellen")
+                Text(stringResource(R.string.create))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Abbrechen")
+                Text(stringResource(R.string.cancel))
             }
         }
     )

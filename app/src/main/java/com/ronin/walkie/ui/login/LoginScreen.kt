@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -67,7 +68,6 @@ fun LoginScreen(
                 contentScale = ContentScale.Fit
             )
 
-
             // App Name
             Text(
                 text = "Walkie",
@@ -79,7 +79,7 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Echtzeit-Sprachkommunikation",
+                text = stringResource(R.string.app_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -98,7 +98,10 @@ fun LoginScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (uiState.isReconnecting) "Wiederverbinde..." else "Verbinde zum Server...",
+                        text = if (uiState.isReconnecting)
+                            stringResource(R.string.reconnecting)
+                        else
+                            stringResource(R.string.connecting),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -117,7 +120,7 @@ fun LoginScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Verbunden mit Server",
+                        text = stringResource(R.string.connected_to_server),
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFF4CAF50)
                     )
@@ -160,7 +163,7 @@ fun LoginScreen(
                         ) {
                             Icon(
                                 Icons.Default.Close,
-                                contentDescription = "Schließen",
+                                contentDescription = stringResource(R.string.close),
                                 modifier = Modifier.size(16.dp)
                             )
                         }
@@ -176,14 +179,14 @@ fun LoginScreen(
                     isError = false
                     onClearError()
                 },
-                label = { Text("Dein Name") },
-                placeholder = { Text("z.B. Max") },
+                label = { Text(stringResource(R.string.your_name)) },
+                placeholder = { Text(stringResource(R.string.name_placeholder)) },
                 singleLine = true,
                 isError = isError || uiState.error != null,
                 supportingText = if (isError || uiState.error != null) {
                     {
                         Text(
-                            text = uiState.error ?: "Name muss mindestens 2 Zeichen haben",
+                            text = uiState.error ?: stringResource(R.string.name_min_length),
                             color = MaterialTheme.colorScheme.error
                         )
                     }
@@ -240,7 +243,7 @@ fun LoginScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        "Channel beitreten",
+                        stringResource(R.string.join_channel),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -251,7 +254,7 @@ fun LoginScreen(
 
             // Version
             Text(
-                text = "Version 2.0",
+                text = stringResource(R.string.version),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )

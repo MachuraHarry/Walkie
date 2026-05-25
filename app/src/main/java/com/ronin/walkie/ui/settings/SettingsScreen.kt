@@ -49,6 +49,7 @@ fun SettingsScreen(
     onToggleSpeakerDefault: () -> Unit,
     onToggleAudioCompression: () -> Unit,
     onSetPttToggleLockThreshold: (Int) -> Unit,
+    onSetLanguage: (String) -> Unit,
     onShowResetDialog: () -> Unit,
     onHideResetDialog: () -> Unit,
     onResetAllSettings: () -> Unit,
@@ -330,6 +331,21 @@ fun SettingsScreen(
                 DarkModeSelector(
                     selectedMode = uiState.darkMode,
                     onSelect = onSetDarkMode
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ===== SPRACHE =====
+            SectionHeader(
+                icon = Icons.Default.Language,
+                title = "Sprache"
+            )
+
+            SettingsCard {
+                LanguageSelector(
+                    selectedLanguage = uiState.language,
+                    onSelect = onSetLanguage
                 )
             }
 
@@ -1034,5 +1050,88 @@ fun DarkModeSelector(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun LanguageSelector(
+    selectedLanguage: String,
+    onSelect: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Default.Language,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                "Sprache",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        val languages = listOf(
+            "de" to "Deutsch",
+            "en" to "English",
+            "hr" to "Hrvatski",
+            "nb" to "Norsk"
+        )
+
+        languages.forEach { (code, label) ->
+            val isSelected = code == selectedLanguage
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onSelect(code) }
+                    .padding(vertical = 6.dp, horizontal = 40.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(
+                    selected = isSelected,
+                    onClick = { onSelect(code) }
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        if (code == "de") Icons.Default.Flag else Icons.Default.Language,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = if (isSelected)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isSelected)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            "Sprachwechsel wird nach Neustart der App wirksam",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            modifier = Modifier.padding(start = 40.dp)
+        )
     }
 }

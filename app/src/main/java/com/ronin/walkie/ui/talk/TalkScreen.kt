@@ -21,10 +21,12 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ronin.walkie.R
 import com.ronin.walkie.viewmodel.ConnectionQuality
 import com.ronin.walkie.viewmodel.TalkUiState
 
@@ -45,8 +47,8 @@ fun TalkScreen(
         AlertDialog(
             onDismissRequest = { showLeaveDialog = false },
             shape = RoundedCornerShape(24.dp),
-            title = { Text("Channel verlassen?") },
-            text = { Text("Bist du sicher, dass du den Channel verlassen möchtest?") },
+            title = { Text(stringResource(R.string.leave_channel_title)) },
+            text = { Text(stringResource(R.string.leave_channel_confirm)) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -57,12 +59,12 @@ fun TalkScreen(
                         containerColor = MaterialTheme.colorScheme.error
                     )
                 ) {
-                    Text("Verlassen")
+                    Text(stringResource(R.string.leave))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showLeaveDialog = false }) {
-                    Text("Abbrechen")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
@@ -81,7 +83,7 @@ fun TalkScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            uiState.channel?.name ?: "Channel",
+                            uiState.channel?.name ?: stringResource(R.string.channel),
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -90,7 +92,7 @@ fun TalkScreen(
                     IconButton(onClick = { showLeaveDialog = true }) {
                         Icon(
                             Icons.Default.ArrowBack,
-                            contentDescription = "Verlassen"
+                            contentDescription = stringResource(R.string.leave)
                         )
                     }
                 },
@@ -124,12 +126,12 @@ fun TalkScreen(
                             ConnectionQuality.UNKNOWN -> Color(0xFF9E9E9E)
                         }
                         val connectionText = when {
-                            uiState.isReconnecting -> "Wiederverbinde..."
-                            uiState.connectionQuality == ConnectionQuality.DISCONNECTED -> "Getrennt"
-                            uiState.connectionQuality == ConnectionQuality.POOR -> "Schlecht"
-                            uiState.connectionQuality == ConnectionQuality.FAIR -> "Mittel"
-                            uiState.connectionQuality == ConnectionQuality.GOOD -> "Verbunden"
-                            else -> "Unbekannt"
+                            uiState.isReconnecting -> stringResource(R.string.reconnecting_status)
+                            uiState.connectionQuality == ConnectionQuality.DISCONNECTED -> stringResource(R.string.disconnected_status)
+                            uiState.connectionQuality == ConnectionQuality.POOR -> stringResource(R.string.quality_poor)
+                            uiState.connectionQuality == ConnectionQuality.FAIR -> stringResource(R.string.quality_fair)
+                            uiState.connectionQuality == ConnectionQuality.GOOD -> stringResource(R.string.connected_status)
+                            else -> stringResource(R.string.quality_unknown)
                         }
 
                         Box(
@@ -149,7 +151,7 @@ fun TalkScreen(
 
                         if (uiState.isConnected) {
                             Text(
-                                "Ping: ${uiState.ping}ms",
+                                stringResource(R.string.ping_ms, uiState.ping),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -161,13 +163,13 @@ fun TalkScreen(
                         if (uiState.isHeadsetPlugged) {
                             Icon(
                                 Icons.Default.Headphones,
-                                contentDescription = "Kopfhörer",
+                                contentDescription = stringResource(R.string.headphones),
                                 modifier = Modifier.size(16.dp),
                                 tint = Color(0xFF2196F3)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                "Kopfhörer",
+                                stringResource(R.string.headphones),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color(0xFF2196F3)
                             )
@@ -182,7 +184,7 @@ fun TalkScreen(
                                 uiState.isSpeakerOn -> Icons.Default.VolumeUp
                                 else -> Icons.Default.VolumeOff
                             },
-                            contentDescription = "Audio-Ausgang",
+                            contentDescription = stringResource(R.string.audio_output),
                             modifier = Modifier.size(16.dp),
                             tint = when {
                                 isAudioThroughHeadphones -> Color(0xFF2196F3)
@@ -193,9 +195,9 @@ fun TalkScreen(
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             when {
-                                isAudioThroughHeadphones -> "Kopfhörer"
-                                uiState.isSpeakerOn -> "Lautsprecher an"
-                                else -> "Lautsprecher aus"
+                                isAudioThroughHeadphones -> stringResource(R.string.headphones)
+                                uiState.isSpeakerOn -> stringResource(R.string.speaker_on)
+                                else -> stringResource(R.string.speaker_off)
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -218,7 +220,7 @@ fun TalkScreen(
                     modifier = Modifier.padding(vertical = 8.dp),
                     action = {
                         TextButton(onClick = { /* clearError */ }) {
-                            Text("OK")
+                            Text(stringResource(R.string.ok))
                         }
                     }
                 ) {
@@ -255,13 +257,8 @@ fun TalkScreen(
                         .align(Alignment.CenterEnd)
                         .padding(end = 8.dp)
                 ) {
-                    // Button zeigt je nach Zustand:
-                    // - Kopfhörer angeschlossen + Lautsprecher AUS → Headphones-Icon (blau)
-                    // - Kopfhörer angeschlossen + Lautsprecher AN → VolumeUp-Icon (grün)
-                    // - Keine Kopfhörer + Lautsprecher AN → VolumeUp-Icon (grün)
-                    // - Keine Kopfhörer + Lautsprecher AUS → VolumeOff-Icon (grau)
                     val isAudioThroughHeadphones = uiState.isHeadsetPlugged && !uiState.isSpeakerOn
-                    
+
                     IconButton(
                         onClick = onToggleSpeaker,
                         modifier = Modifier.size(48.dp)
@@ -272,11 +269,11 @@ fun TalkScreen(
                                 uiState.isSpeakerOn -> Icons.Default.VolumeUp
                                 else -> Icons.Default.VolumeOff
                             },
-                            contentDescription = "Lautsprecher",
+                            contentDescription = stringResource(R.string.speaker),
                             tint = when {
-                                isAudioThroughHeadphones -> Color(0xFF2196F3) // Blau für Kopfhörer
-                                uiState.isSpeakerOn -> Color(0xFF4CAF50) // Grün für Lautsprecher an
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant // Grau für aus
+                                isAudioThroughHeadphones -> Color(0xFF2196F3)
+                                uiState.isSpeakerOn -> Color(0xFF4CAF50)
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
                             },
                             modifier = Modifier.size(28.dp)
                         )
@@ -288,14 +285,14 @@ fun TalkScreen(
             if (uiState.isToggleMode) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    "🔒 Dauer-Senden aktiv – Button nach unten ziehen zum Beenden",
+                    stringResource(R.string.toggle_mode_active),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.tertiary
                 )
             } else {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    "👆 Gedrückt halten oder nach oben ziehen für Dauer-Modus",
+                    stringResource(R.string.ptt_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -359,7 +356,7 @@ fun MemberListSection(
             modifier = Modifier.padding(bottom = 8.dp)
         ) {
             Text(
-                "Mitglieder",
+                stringResource(R.string.members),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -417,9 +414,9 @@ fun MemberItem(
     }
 
     val statusText = when {
-        isTalking && isSelf -> "Du sendest"
-        isTalking -> "spricht"
-        else -> "hört zu"
+        isTalking && isSelf -> stringResource(R.string.you_are_transmitting)
+        isTalking -> stringResource(R.string.is_speaking)
+        else -> stringResource(R.string.is_listening)
     }
 
     Card(
@@ -468,7 +465,7 @@ fun MemberItem(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    if (isSelf) "$username (Du)" else username,
+                    if (isSelf) stringResource(R.string.you_label, username) else username,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = if (isSelf) FontWeight.Bold else FontWeight.Normal
                 )
@@ -573,10 +570,10 @@ fun PTTButton(
     }
 
     val buttonText = when {
-        !isConnected -> "KEINE VERBINDUNG"
-        isToggleMode -> "DAUER-SENDEN"
-        isTransmitting -> "SENDET"
-        else -> "HALTEN & SPRECHEN"
+        !isConnected -> stringResource(R.string.ptt_no_connection)
+        isToggleMode -> stringResource(R.string.ptt_locked)
+        isTransmitting -> stringResource(R.string.ptt_transmitting)
+        else -> stringResource(R.string.ptt_hold_to_talk)
     }
 
     Box(
@@ -686,7 +683,6 @@ fun PTTButton(
                                     }
                                 }
 
-
                                 change.consume()
                             }
 
@@ -717,7 +713,7 @@ fun PTTButton(
             ) {
                 Icon(
                     buttonIcon,
-                    contentDescription = "PTT",
+                    contentDescription = stringResource(R.string.ptt),
                     modifier = Modifier.size(48.dp),
                     tint = if (isTransmitting || isToggleMode) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                 )

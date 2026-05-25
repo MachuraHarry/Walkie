@@ -26,6 +26,7 @@ class SettingsManager(context: Context) {
         const val KEY_SPEAKER_DEFAULT = "speaker_default" // true = Lautsprecher an
         const val KEY_AUDIO_COMPRESSION = "audio_compression"
         const val KEY_PTT_TOGGLE_LOCK_THRESHOLD = "ptt_toggle_lock_threshold" // in dp
+        const val KEY_LANGUAGE = "language" // "de" oder "en"
 
         // Defaults
         const val DEFAULT_USERNAME = ""
@@ -39,6 +40,7 @@ class SettingsManager(context: Context) {
         const val DEFAULT_SPEAKER_DEFAULT = true
         const val DEFAULT_AUDIO_COMPRESSION = false
         const val DEFAULT_PTT_TOGGLE_LOCK_THRESHOLD = 80
+        const val DEFAULT_LANGUAGE = "de"
     }
 
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -122,6 +124,13 @@ class SettingsManager(context: Context) {
     fun setPttToggleLockThreshold(threshold: Int) {
         Log.d(TAG, "🔒 PTT toggle lock threshold: ${threshold}dp")
         prefs.edit().putInt(KEY_PTT_TOGGLE_LOCK_THRESHOLD, threshold).apply()
+    }
+
+    // ===== Sprache =====
+    fun getLanguage(): String = prefs.getString(KEY_LANGUAGE, DEFAULT_LANGUAGE) ?: DEFAULT_LANGUAGE
+    fun setLanguage(language: String) {
+        Log.d(TAG, "🌐 Setting language: $language")
+        prefs.edit().putString(KEY_LANGUAGE, language).apply()
     }
 
     // ===== Alle Einstellungen zurücksetzen =====

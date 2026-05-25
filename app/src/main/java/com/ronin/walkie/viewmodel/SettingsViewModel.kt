@@ -22,6 +22,7 @@ data class SettingsUiState(
     val isSpeakerDefault: Boolean = true,
     val isAudioCompressionEnabled: Boolean = false,
     val pttToggleLockThreshold: Int = 80,
+    val language: String = "de", // "de" oder "en"
     val isUsernameEditing: Boolean = false,
     val isServerUrlEditing: Boolean = false,
     val showResetDialog: Boolean = false,
@@ -59,7 +60,8 @@ class SettingsViewModel(
             darkMode = settingsManager.getDarkMode(),
             isSpeakerDefault = settingsManager.isSpeakerDefault(),
             isAudioCompressionEnabled = settingsManager.isAudioCompressionEnabled(),
-            pttToggleLockThreshold = settingsManager.getPttToggleLockThreshold()
+            pttToggleLockThreshold = settingsManager.getPttToggleLockThreshold(),
+            language = settingsManager.getLanguage()
         )
         Log.d(TAG, "📋 Settings loaded: ${settingsManager.getAllSettings()}")
     }
@@ -192,6 +194,17 @@ class SettingsViewModel(
         settingsManager.setPttToggleLockThreshold(threshold)
         _uiState.value = _uiState.value.copy(pttToggleLockThreshold = threshold)
         Log.d(TAG, "🔒 PTT toggle lock threshold set: ${threshold}dp")
+    }
+
+    // ===== Sprache =====
+    fun setLanguage(language: String) {
+        settingsManager.setLanguage(language)
+        _uiState.value = _uiState.value.copy(
+            language = language,
+            savedMessage = "🌐 Sprache geändert (Neustart erforderlich)"
+        )
+        clearSavedMessageAfterDelay()
+        Log.d(TAG, "🌐 Language set: $language")
     }
 
     // ===== Reset =====

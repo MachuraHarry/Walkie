@@ -1,4 +1,144 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Walkie</string>
+
+    <!-- Login Screen -->
+    <string name="app_subtitle">Echtzeit-Sprachkommunikation</string>
+    <string name="connecting">Verbinde zum Server…</string>
+    <string name="reconnecting">Wiederverbinde…</string>
+    <string name="connected_to_server">Verbunden mit Server</string>
+    <string name="your_name">Dein Name</string>
+    <string name="name_placeholder">z.B. Max</string>
+    <string name="name_min_length">Name muss mindestens 2 Zeichen haben</string>
+    <string name="join_channel">Channel beitreten</string>
+    <string name="version">Version 2.0</string>
+    <string name="close">Schließen</string>
+
+    <!-- Channel List -->
+    <string name="channels">Channels</string>
+    <string name="reconnecting_status">Wiederverbinde…</string>
+    <string name="connected_status">Verbunden</string>
+    <string name="disconnected_status">Getrennt</string>
+    <string name="refresh">Aktualisieren</string>
+    <string name="settings">Einstellungen</string>
+    <string name="create_channel">Channel erstellen</string>
+    <string name="hello_user">Hallo %s!</string>
+    <string name="channel_select_hint">Wähle einen Channel zum Beitreten oder erstelle einen neuen.</string>
+    <string name="loading_channels">Lade Channels…</string>
+    <string name="no_channels">Noch keine Channels vorhanden</string>
+    <string name="create_channel_hint">Erstelle einen neuen Channel mit dem + Button</string>
+    <string name="join">Beitreten</string>
+
+    <!-- Create Channel Dialog -->
+    <string name="create_channel_title">Channel erstellen</string>
+    <string name="channel_name">Channel-Name</string>
+    <string name="channel_name_placeholder">z.B. Allgemein</string>
+    <string name="channel_description">Beschreibung (optional)</string>
+    <string name="channel_description_placeholder">Wofür ist dieser Channel?</string>
+    <string name="color">Farbe</string>
+    <string name="create">Erstellen</string>
+    <string name="cancel">Abbrechen</string>
+    <string name="color_green">Grün</string>
+    <string name="color_blue">Blau</string>
+    <string name="color_orange">Orange</string>
+    <string name="color_purple">Lila</string>
+    <string name="color_red">Rot</string>
+    <string name="color_yellow">Gelb</string>
+
+    <!-- Talk Screen -->
+    <string name="channel">Channel</string>
+    <string name="leave_channel_title">Channel verlassen?</string>
+    <string name="leave_channel_confirm">Bist du sicher, dass du den Channel verlassen möchtest?</string>
+    <string name="leave">Verlassen</string>
+    <string name="members">Mitglieder</string>
+    <string name="you_are_transmitting">Du sendest</string>
+    <string name="is_speaking">spricht</string>
+    <string name="is_listening">hört zu</string>
+    <string name="you_label">%s (Du)</string>
+    <string name="headphones">Kopfhörer</string>
+    <string name="speaker_on">Lautsprecher an</string>
+    <string name="speaker_off">Lautsprecher aus</string>
+    <string name="quality_poor">Schlecht</string>
+    <string name="quality_fair">Mittel</string>
+    <string name="quality_unknown">Unbekannt</string>
+    <string name="ping_ms">Ping: %dms</string>
+    <string name="toggle_mode_active">🔒 Dauer-Senden aktiv – Button nach unten ziehen zum Beenden</string>
+    <string name="ptt_hint">👆 Gedrückt halten oder nach oben ziehen für Dauer-Modus</string>
+    <string name="ptt_no_connection">KEINE VERBINDUNG</string>
+    <string name="ptt_locked">DAUER-SENDEN</string>
+    <string name="ptt_transmitting">SENDET</string>
+    <string name="ptt_hold_to_talk">HALTEN &amp; SPRECHEN</string>
+    <string name="ptt">PTT</string>
+    <string name="ok">OK</string>
+    <string name="audio_output">Audio-Ausgang</string>
+    <string name="speaker">Lautsprecher</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Einstellungen</string>
+    <string name="back">Zurück</string>
+    <string name="profile_section">Profil</string>
+    <string name="username">Benutzername</string>
+    <string name="not_set">Nicht gesetzt</string>
+    <string name="edit_username">Benutzername bearbeiten</string>
+    <string name="save">Speichern</string>
+    <string name="username_saved">✅ Benutzername gespeichert</string>
+    <string name="username_error">❌ Name muss mindestens 2 Zeichen haben</string>
+    <string name="audio_section">Audio</string>
+    <string name="sound_effects">Sound-Effekte (on/off)</string>
+    <string name="sound_effects_desc">Walkie-Talkie Ein-/Aus-Sounds beim Senden</string>
+    <string name="audio_quality">Audio-Qualität</string>
+    <string name="audio_quality_8khz">8 kHz (Telefonqualität)</string>
+    <string name="audio_quality_16khz">16 kHz (Standard)</string>
+    <string name="audio_quality_32khz">32 kHz (Hohe Qualität)</string>
+    <string name="audio_quality_44khz">44.1 kHz (CD-Qualität)</string>
+    <string name="recommended">(empfohlen)</string>
+    <string name="audio_compression">Audio-Kompression</string>
+    <string name="audio_compression_desc">Reduziert Datenverbrauch (experimentell)</string>
+    <string name="speaker_default">Lautsprecher standardmäßig aktiv</string>
+    <string name="speaker_default_desc">Beim Betreten eines Channels</string>
+    <string name="ptt_section">Sprechen (PTT)</string>
+    <string name="ptt_mode">PTT-Modus</string>
+    <string name="ptt_hold">Gedrückt halten</string>
+    <string name="ptt_hold_desc">Senden nur solange der Button gedrückt wird</string>
+    <string name="ptt_toggle">Dauer-Senden (Toggle)</string>
+    <string name="ptt_toggle_desc">Einmal drücken zum Starten, erneut drücken zum Stoppen</string>
+    <string name="ptt_lock_threshold">Toggle-Einrastschwelle</string>
+    <string name="ptt_lock_threshold_desc">%d dp – Nach oben ziehen zum Einrasten</string>
+    <string name="vad">Stille-Erkennung (VAD)</string>
+    <string name="vad_desc">Automatisches Stoppen bei Stille</string>
+    <string name="vad_sensitivity">Stille-Empfindlichkeit</string>
+    <string name="vad_threshold">Schwellwert: %d</string>
+    <string name="sensitive">Empfindlich</string>
+    <string name="insensitive">Unempfindlich</string>
+    <string name="design_section">Design</string>
+    <string name="appearance">Erscheinungsbild</string>
+    <string name="system_mode">Wie System</string>
+    <string name="light_mode">Hell</string>
+    <string name="dark_mode">Dunkel</string>
+    <string name="server_section">Server</string>
+    <string name="server_url">Server-URL</string>
+    <string name="server_url_default">Standard (App)</string>
+    <string name="edit_server_url">Server-URL bearbeiten</string>
+    <string name="server_url_hint">Nur ändern, wenn du einen eigenen Server verwendest.</string>
+    <string name="server_url_saved">🌐 Server-URL gespeichert (Neustart erforderlich)</string>
+    <string name="info_section">Info</string>
+    <string name="app_version">App-Version</string>
+    <string name="developed_by">Entwickelt von</string>
+    <string name="reset_settings">Alle Einstellungen zurücksetzen</string>
+    <string name="reset_dialog_title">Einstellungen zurücksetzen?</string>
+    <string name="reset_dialog_text">Alle Einstellungen werden auf die Standardwerte zurückgesetzt. Diese Aktion kann nicht rückgängig gemacht werden.</string>
+    <string name="reset">Zurücksetzen</string>
+    <string name="reset_success">🔄 Alle Einstellungen zurückgesetzt</string>
+    <string name="restart_dialog_title">Neustart empfohlen</string>
+    <string name="restart_dialog_text">Einige Einstellungen (wie die Audio-Qualität) werden erst nach einem Neustart der App wirksam. Bitte starte die App neu, um die Änderungen zu übernehmen.</string>
+    <string name="edit">Bearbeiten</string>
+    <string name="easy">Leicht</string>
+    <string name="hard">Schwer</string>
+
+    <!-- Language -->
+    <string name="language_section">Sprache</string>
+    <string name="language">Sprache</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_english">English</string>
+    <string name="language_restart_hint">Sprachwechsel wird nach Neustart der App wirksam</string>
 </resources>

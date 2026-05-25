@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Walkie</string>
+
+    <!-- Login Screen -->
+    <string name="app_subtitle">Glasovna komunikacija u stvarnom vremenu</string>
+    <string name="connecting">Povezivanje sa serverom…</string>
+    <string name="reconnecting">Ponovno povezivanje…</string>
+    <string name="connected_to_server">Povezan sa serverom</string>
+    <string name="your_name">Tvoje ime</string>
+    <string name="name_placeholder">npr. Marko</string>
+    <string name="name_min_length">Ime mora imati najmanje 2 znaka</string>
+    <string name="join_channel">Pridruži se kanalu</string>
+    <string name="version">Verzija 2.0</string>
+    <string name="close">Zatvori</string>
+
+    <!-- Channel List -->
+    <string name="channels">Kanali</string>
+    <string name="reconnecting_status">Ponovno povezivanje…</string>
+    <string name="connected_status">Povezan</string>
+    <string name="disconnected_status">Prekinuta veza</string>
+    <string name="refresh">Osvježi</string>
+    <string name="settings">Postavke</string>
+    <string name="create_channel">Stvori kanal</string>
+    <string name="hello_user">Pozdrav %s!</string>
+    <string name="channel_select_hint">Odaberi kanal za pridruživanje ili stvori novi.</string>
+    <string name="loading_channels">Učitavanje kanala…</string>
+    <string name="no_channels">Još nema kanala</string>
+    <string name="create_channel_hint">Stvori novi kanal pomoću + gumba</string>
+    <string name="join">Pridruži se</string>
+
+    <!-- Create Channel Dialog -->
+    <string name="create_channel_title">Stvori kanal</string>
+    <string name="channel_name">Naziv kanala</string>
+    <string name="channel_name_placeholder">npr. Općenito</string>
+    <string name="channel_description">Opis (opcionalno)</string>
+    <string name="channel_description_placeholder">Čemu služi ovaj kanal?</string>
+    <string name="color">Boja</string>
+    <string name="create">Stvori</string>
+    <string name="cancel">Odustani</string>
+    <string name="color_green">Zelena</string>
+    <string name="color_blue">Plava</string>
+    <string name="color_orange">Narančasta</string>
+    <string name="color_purple">Ljubičasta</string>
+    <string name="color_red">Crvena</string>
+    <string name="color_yellow">Žuta</string>
+
+    <!-- Talk Screen -->
+    <string name="channel">Kanal</string>
+    <string name="leave_channel_title">Napustiti kanal?</string>
+    <string name="leave_channel_confirm">Jesi li siguran da želiš napustiti kanal?</string>
+    <string name="leave">Napusti</string>
+    <string name="members">Članovi</string>
+    <string name="you_are_transmitting">Ti šalješ</string>
+    <string name="is_speaking">govori</string>
+    <string name="is_listening">sluša</string>
+    <string name="you_label">%s (Ti)</string>
+    <string name="headphones">Slušalice</string>
+    <string name="speaker_on">Zvučnik uključen</string>
+    <string name="speaker_off">Zvučnik isključen</string>
+    <string name="quality_poor">Loše</string>
+    <string name="quality_fair">Srednje</string>
+    <string name="quality_unknown">Nepoznato</string>
+    <string name="ping_ms">Ping: %dms</string>
+    <string name="toggle_mode_active">🔒 Kontinuirano slanje aktivno – povucite gumb prema dolje za zaustavljanje</string>
+    <string name="ptt_hint">👆 Pritisnite i držite ili povucite prema gore za kontinuirani način</string>
+    <string name="ptt_no_connection">NEMA VEZE</string>
+    <string name="ptt_locked">KONTINUIRANO SLANJE</string>
+    <string name="ptt_transmitting">ŠALJE</string>
+    <string name="ptt_hold_to_talk">DRŽI I GOVORI</string>
+    <string name="ptt">PTT</string>
+    <string name="ok">U redu</string>
+    <string name="audio_output">Audio izlaz</string>
+    <string name="speaker">Zvučnik</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Postavke</string>
+    <string name="back">Natrag</string>
+    <string name="profile_section">Profil</string>
+    <string name="username">Korisničko ime</string>
+    <string name="not_set">Nije postavljeno</string>
+    <string name="edit_username">Uredi korisničko ime</string>
+    <string name="save">Spremi</string>
+    <string name="username_saved">✅ Korisničko ime spremljeno</string>
+    <string name="username_error">❌ Ime mora imati najmanje 2 znaka</string>
+    <string name="audio_section">Audio</string>
+    <string name="sound_effects">Zvučni efekti (uklj./isklj.)</string>
+    <string name="sound_effects_desc">Walkie-Talkie zvukovi pri slanju</string>
+    <string name="audio_quality">Kvaliteta zvuka</string>
+    <string name="audio_quality_8khz">8 kHz (Telefonska kvaliteta)</string>
+    <string name="audio_quality_16khz">16 kHz (Standardno)</string>
+    <string name="audio_quality_32khz">32 kHz (Visoka kvaliteta)</string>
+    <string name="audio_quality_44khz">44.1 kHz (CD kvaliteta)</string>
+    <string name="recommended">(preporučeno)</string>
+    <string name="audio_compression">Kompresija zvuka</string>
+    <string name="audio_compression_desc">Smanjuje potrošnju podataka (eksperimentalno)</string>
+    <string name="speaker_default">Zvučnik standardno uključen</string>
+    <string name="speaker_default_desc">Prilikom ulaska u kanal</string>
+    <string name="ptt_section">Govor (PTT)</string>
+    <string name="ptt_mode">PTT način</string>
+    <string name="ptt_hold">Pritisni i drži</string>
+    <string name="ptt_hold_desc">Slanje samo dok je gumb pritisnut</string>
+    <string name="ptt_toggle">Kontinuirano (Toggle)</string>
+    <string name="ptt_toggle_desc">Pritisni jednom za početak, ponovno za zaustavljanje</string>
+    <string name="ptt_lock_threshold">Prag zaključavanja</string>
+    <string name="ptt_lock_threshold_desc">%d dp – Povuci prema gore za zaključavanje</string>
+    <string name="vad">Detekcija tišine (VAD)</string>
+    <string name="vad_desc">Automatsko zaustavljanje pri tišini</string>
+    <string name="vad_sensitivity">Osjetljivost tišine</string>
+    <string name="vad_threshold">Prag: %d</string>
+    <string name="sensitive">Osjetljivo</string>
+    <string name="insensitive">Neosjetljivo</string>
+    <string name="design_section">Dizajn</string>
+    <string name="appearance">Izgled</string>
+    <string name="system_mode">Prati sustav</string>
+    <string name="light_mode">Svijetlo</string>
+    <string name="dark_mode">Tamno</string>
+    <string name="server_section">Server</string>
+    <string name="server_url">URL servera</string>
+    <string name="server_url_default">Zadano (App)</string>
+    <string name="edit_server_url">Uredi URL servera</string>
+    <string name="server_url_hint">Mijenjaj samo ako koristiš vlastiti server.</string>
+    <string name="server_url_saved">🌐 URL servera spremljen (ponovno pokretanje potrebno)</string>
+    <string name="info_section">Informacije</string>
+    <string name="app_version">Verzija aplikacije</string>
+    <string name="developed_by">Razvio</string>
+    <string name="reset_settings">Resetiraj sve postavke</string>
+    <string name="reset_dialog_title">Resetirati postavke?</string>
+    <string name="reset_dialog_text">Sve postavke bit će vraćene na zadane vrijednosti. Ova radnja se ne može poništiti.</string>
+    <string name="reset">Resetiraj</string>
+    <string name="reset_success">🔄 Sve postavke resetirane</string>
+    <string name="restart_dialog_title">Ponovno pokretanje preporučeno</string>
+    <string name="restart_dialog_text">Neke postavke (poput kvalitete zvuka) stupaju na snagu tek nakon ponovnog pokretanja aplikacije. Molimo ponovno pokrenite aplikaciju.</string>
+    <string name="edit">Uredi</string>
+    <string name="easy">Lako</string>
+    <string name="hard">Teško</string>
+
+    <!-- Language -->
+    <string name="language_section">Jezik</string>
+    <string name="language">Jezik</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_english">English</string>
+    <string name="language_restart_hint">Promjena jezika stupa na snagu nakon ponovnog pokretanja aplikacije</string>
+</resources>

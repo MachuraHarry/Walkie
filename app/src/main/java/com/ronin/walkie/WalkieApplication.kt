@@ -9,6 +9,8 @@ import com.ronin.walkie.audio.AudioPlayer
 import com.ronin.walkie.audio.AudioRecorder
 import com.ronin.walkie.audio.SoundEffectPlayer
 import com.ronin.walkie.network.WalkieWebSocketClient
+import com.ronin.walkie.settings.LocaleHelper
+import com.ronin.walkie.settings.SettingsManager
 
 class WalkieApplication : Application() {
 
@@ -76,6 +78,13 @@ class WalkieApplication : Application() {
         super.onCreate()
         Log.d(TAG, "🚀 WalkieApplication.onCreate()")
         instance = this
+
+        // Gespeicherte Sprache anwenden
+        val settingsManager = SettingsManager(this)
+        val language = settingsManager.getLanguage()
+        LocaleHelper.setLocale(this, language)
+        Log.d(TAG, "🌐 Applied locale: $language")
+
         initializeWebSocket()
         audioPlayer = AudioPlayer()
         // AudioManager für Audio-Fokus setzen

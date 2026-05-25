@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Walkie</string>
+
+    <!-- Login Screen -->
+    <string name="app_subtitle">Real-time Voice Communication</string>
+    <string name="connecting">Connecting to server…</string>
+    <string name="reconnecting">Reconnecting…</string>
+    <string name="connected_to_server">Connected to server</string>
+    <string name="your_name">Your Name</string>
+    <string name="name_placeholder">e.g. Max</string>
+    <string name="name_min_length">Name must be at least 2 characters</string>
+    <string name="join_channel">Join Channel</string>
+    <string name="version">Version 2.0</string>
+    <string name="close">Close</string>
+
+    <!-- Channel List -->
+    <string name="channels">Channels</string>
+    <string name="reconnecting_status">Reconnecting…</string>
+    <string name="connected_status">Connected</string>
+    <string name="disconnected_status">Disconnected</string>
+    <string name="refresh">Refresh</string>
+    <string name="settings">Settings</string>
+    <string name="create_channel">Create Channel</string>
+    <string name="hello_user">Hello %s!</string>
+    <string name="channel_select_hint">Choose a channel to join or create a new one.</string>
+    <string name="loading_channels">Loading channels…</string>
+    <string name="no_channels">No channels yet</string>
+    <string name="create_channel_hint">Create a new channel with the + button</string>
+    <string name="join">Join</string>
+
+    <!-- Create Channel Dialog -->
+    <string name="create_channel_title">Create Channel</string>
+    <string name="channel_name">Channel Name</string>
+    <string name="channel_name_placeholder">e.g. General</string>
+    <string name="channel_description">Description (optional)</string>
+    <string name="channel_description_placeholder">What is this channel for?</string>
+    <string name="color">Color</string>
+    <string name="create">Create</string>
+    <string name="cancel">Cancel</string>
+    <string name="color_green">Green</string>
+    <string name="color_blue">Blue</string>
+    <string name="color_orange">Orange</string>
+    <string name="color_purple">Purple</string>
+    <string name="color_red">Red</string>
+    <string name="color_yellow">Yellow</string>
+
+    <!-- Talk Screen -->
+    <string name="channel">Channel</string>
+    <string name="leave_channel_title">Leave channel?</string>
+    <string name="leave_channel_confirm">Are you sure you want to leave the channel?</string>
+    <string name="leave">Leave</string>
+    <string name="members">Members</string>
+    <string name="you_are_transmitting">You are sending</string>
+    <string name="is_speaking">is speaking</string>
+    <string name="is_listening">is listening</string>
+    <string name="you_label">%s (You)</string>
+    <string name="headphones">Headphones</string>
+    <string name="speaker_on">Speaker on</string>
+    <string name="speaker_off">Speaker off</string>
+    <string name="quality_poor">Poor</string>
+    <string name="quality_fair">Fair</string>
+    <string name="quality_unknown">Unknown</string>
+    <string name="ping_ms">Ping: %dms</string>
+    <string name="toggle_mode_active">🔒 Continuous send active – drag button down to stop</string>
+    <string name="ptt_hint">👆 Press and hold or drag up for continuous mode</string>
+    <string name="ptt_no_connection">NO CONNECTION</string>
+    <string name="ptt_locked">CONTINUOUS SEND</string>
+    <string name="ptt_transmitting">SENDING</string>
+    <string name="ptt_hold_to_talk">HOLD &amp; TALK</string>
+    <string name="ptt">PTT</string>
+    <string name="ok">OK</string>
+    <string name="audio_output">Audio Output</string>
+    <string name="speaker">Speaker</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Settings</string>
+    <string name="back">Back</string>
+    <string name="profile_section">Profile</string>
+    <string name="username">Username</string>
+    <string name="not_set">Not set</string>
+    <string name="edit_username">Edit username</string>
+    <string name="save">Save</string>
+    <string name="username_saved">✅ Username saved</string>
+    <string name="username_error">❌ Name must be at least 2 characters</string>
+    <string name="audio_section">Audio</string>
+    <string name="sound_effects">Sound Effects (on/off)</string>
+    <string name="sound_effects_desc">Walkie-Talkie on/off sounds when transmitting</string>
+    <string name="audio_quality">Audio Quality</string>
+    <string name="audio_quality_8khz">8 kHz (Phone quality)</string>
+    <string name="audio_quality_16khz">16 kHz (Standard)</string>
+    <string name="audio_quality_32khz">32 kHz (High quality)</string>
+    <string name="audio_quality_44khz">44.1 kHz (CD quality)</string>
+    <string name="recommended">(recommended)</string>
+    <string name="audio_compression">Audio Compression</string>
+    <string name="audio_compression_desc">Reduces data usage (experimental)</string>
+    <string name="speaker_default">Speaker enabled by default</string>
+    <string name="speaker_default_desc">When entering a channel</string>
+    <string name="ptt_section">Speaking (PTT)</string>
+    <string name="ptt_mode">PTT Mode</string>
+    <string name="ptt_hold">Press and hold</string>
+    <string name="ptt_hold_desc">Transmit only while button is pressed</string>
+    <string name="ptt_toggle">Toggle (Continuous)</string>
+    <string name="ptt_toggle_desc">Press once to start, press again to stop</string>
+    <string name="ptt_lock_threshold">Toggle Lock Threshold</string>
+    <string name="ptt_lock_threshold_desc">%d dp – Drag up to lock</string>
+    <string name="vad">Silence Detection (VAD)</string>
+    <string name="vad_desc">Automatically stop on silence</string>
+    <string name="vad_sensitivity">Silence Sensitivity</string>
+    <string name="vad_threshold">Threshold: %d</string>
+    <string name="sensitive">Sensitive</string>
+    <string name="insensitive">Insensitive</string>
+    <string name="design_section">Design</string>
+    <string name="appearance">Appearance</string>
+    <string name="system_mode">Follow system</string>
+    <string name="light_mode">Light</string>
+    <string name="dark_mode">Dark</string>
+    <string name="server_section">Server</string>
+    <string name="server_url">Server URL</string>
+    <string name="server_url_default">Default (App)</string>
+    <string name="edit_server_url">Edit server URL</string>
+    <string name="server_url_hint">Only change if you use your own server.</string>
+    <string name="server_url_saved">🌐 Server URL saved (restart required)</string>
+    <string name="info_section">Info</string>
+    <string name="app_version">App Version</string>
+    <string name="developed_by">Developed by</string>
+    <string name="reset_settings">Reset all settings</string>
+    <string name="reset_dialog_title">Reset settings?</string>
+    <string name="reset_dialog_text">All settings will be reset to default values. This action cannot be undone.</string>
+    <string name="reset">Reset</string>
+    <string name="reset_success">🔄 All settings reset</string>
+    <string name="restart_dialog_title">Restart recommended</string>
+    <string name="restart_dialog_text">Some settings (like audio quality) will only take effect after restarting the app. Please restart the app to apply the changes.</string>
+    <string name="edit">Edit</string>
+    <string name="easy">Easy</string>
+    <string name="hard">Hard</string>
+
+    <!-- Language -->
+    <string name="language_section">Language</string>
+    <string name="language">Language</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_english">English</string>
+    <string name="language_restart_hint">Language change will take effect after app restart</string>
+</resources>

@@ -1,6 +1,7 @@
 package com.ronin.walkie
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -28,6 +29,7 @@ import com.ronin.walkie.audio.AudioPlayer
 import com.ronin.walkie.audio.AudioRecorder
 import com.ronin.walkie.model.Channel
 import com.ronin.walkie.network.WalkieWebSocketClient
+import com.ronin.walkie.settings.LocaleHelper
 import com.ronin.walkie.settings.SettingsManager
 import com.ronin.walkie.ui.channels.ChannelListScreen
 import com.ronin.walkie.ui.login.LoginScreen
@@ -47,6 +49,14 @@ class MainActivity : ComponentActivity() {
     private lateinit var webSocketClient: WalkieWebSocketClient
     private lateinit var audioRecorder: AudioRecorder
     private lateinit var audioPlayer: AudioPlayer
+
+    override fun attachBaseContext(newBase: Context) {
+        val settingsManager = SettingsManager(newBase)
+        val language = settingsManager.getLanguage()
+        val context = LocaleHelper.setLocale(newBase, language)
+        super.attachBaseContext(context)
+        Log.d(TAG, "🌐 Applied locale in attachBaseContext: $language")
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -343,6 +353,7 @@ fun WalkieApp(
                     onToggleSpeakerDefault = { settingsViewModel.toggleSpeakerDefault() },
                     onToggleAudioCompression = { settingsViewModel.toggleAudioCompression() },
                     onSetPttToggleLockThreshold = { settingsViewModel.setPttToggleLockThreshold(it) },
+                    onSetLanguage = { settingsViewModel.setLanguage(it) },
                     onShowResetDialog = { settingsViewModel.showResetDialog() },
                     onHideResetDialog = { settingsViewModel.hideResetDialog() },
                     onResetAllSettings = { settingsViewModel.resetAllSettings() },

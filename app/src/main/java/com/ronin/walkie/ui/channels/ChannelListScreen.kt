@@ -16,9 +16,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.ronin.walkie.R
 import com.ronin.walkie.model.Channel
 import com.ronin.walkie.viewmodel.ChannelListUiState
 
@@ -57,7 +59,7 @@ fun ChannelListScreen(
                             tint = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Channels", fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.channels), fontWeight = FontWeight.Bold)
                     }
                 },
                 actions = {
@@ -79,9 +81,9 @@ fun ChannelListScreen(
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = when {
-                                uiState.isReconnecting -> "Wiederverbinde..."
-                                uiState.isConnected -> "Verbunden"
-                                else -> "Getrennt"
+                                uiState.isReconnecting -> stringResource(R.string.reconnecting_status)
+                                uiState.isConnected -> stringResource(R.string.connected_status)
+                                else -> stringResource(R.string.disconnected_status)
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -91,19 +93,19 @@ fun ChannelListScreen(
                     IconButton(onClick = onRefresh) {
                         Icon(
                             Icons.Default.Refresh,
-                            contentDescription = "Aktualisieren"
+                            contentDescription = stringResource(R.string.refresh)
                         )
                     }
                     IconButton(onClick = onSettingsClick) {
                         Icon(
                             Icons.Default.Settings,
-                            contentDescription = "Einstellungen"
+                            contentDescription = stringResource(R.string.settings)
                         )
                     }
                     IconButton(onClick = { showCreateDialog = true }) {
                         Icon(
                             Icons.Default.Add,
-                            contentDescription = "Channel erstellen"
+                            contentDescription = stringResource(R.string.create_channel)
                         )
                     }
                 },
@@ -154,7 +156,7 @@ fun ChannelListScreen(
                         ) {
                             Icon(
                                 Icons.Default.Close,
-                                contentDescription = "Schließen",
+                                contentDescription = stringResource(R.string.close),
                                 modifier = Modifier.size(16.dp)
                             )
                         }
@@ -164,14 +166,14 @@ fun ChannelListScreen(
 
             // Willkommenstext
             Text(
-                text = "Hallo $username!",
+                text = stringResource(R.string.hello_user, username),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
             Text(
-                text = "Wähle einen Channel zum Beitreten oder erstelle einen neuen.",
+                text = stringResource(R.string.channel_select_hint),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
@@ -190,7 +192,7 @@ fun ChannelListScreen(
                         CircularProgressIndicator()
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            "Lade Channels...",
+                            stringResource(R.string.loading_channels),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -213,13 +215,13 @@ fun ChannelListScreen(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            "Noch keine Channels vorhanden",
+                            stringResource(R.string.no_channels),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "Erstelle einen neuen Channel mit dem + Button",
+                            stringResource(R.string.create_channel_hint),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                         )
@@ -306,7 +308,7 @@ fun ChannelCard(
 
             Icon(
                 Icons.Default.ChevronRight,
-                contentDescription = "Beitreten",
+                contentDescription = stringResource(R.string.join),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }

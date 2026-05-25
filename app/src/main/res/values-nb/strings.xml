@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Walkie</string>
+
+    <!-- Login Screen -->
+    <string name="app_subtitle">Sanntids talekommunikasjon</string>
+    <string name="connecting">Kobler til server…</string>
+    <string name="reconnecting">Kobler til igjen…</string>
+    <string name="connected_to_server">Tilkoblet server</string>
+    <string name="your_name">Ditt navn</string>
+    <string name="name_placeholder">f.eks. Ola</string>
+    <string name="name_min_length">Navn må ha minst 2 tegn</string>
+    <string name="join_channel">Bli med i kanal</string>
+    <string name="version">Versjon 2.0</string>
+    <string name="close">Lukk</string>
+
+    <!-- Channel List -->
+    <string name="channels">Kanaler</string>
+    <string name="reconnecting_status">Kobler til igjen…</string>
+    <string name="connected_status">Tilkoblet</string>
+    <string name="disconnected_status">Frakoblet</string>
+    <string name="refresh">Oppdater</string>
+    <string name="settings">Innstillinger</string>
+    <string name="create_channel">Opprett kanal</string>
+    <string name="hello_user">Hei %s!</string>
+    <string name="channel_select_hint">Velg en kanal å bli med i eller opprett en ny.</string>
+    <string name="loading_channels">Laster kanaler…</string>
+    <string name="no_channels">Ingen kanaler ennå</string>
+    <string name="create_channel_hint">Opprett en ny kanal med + knappen</string>
+    <string name="join">Bli med</string>
+
+    <!-- Create Channel Dialog -->
+    <string name="create_channel_title">Opprett kanal</string>
+    <string name="channel_name">Kanalnavn</string>
+    <string name="channel_name_placeholder">f.eks. Generelt</string>
+    <string name="channel_description">Beskrivelse (valgfritt)</string>
+    <string name="channel_description_placeholder">Hva er denne kanalen for?</string>
+    <string name="color">Farge</string>
+    <string name="create">Opprett</string>
+    <string name="cancel">Avbryt</string>
+    <string name="color_green">Grønn</string>
+    <string name="color_blue">Blå</string>
+    <string name="color_orange">Oransje</string>
+    <string name="color_purple">Lilla</string>
+    <string name="color_red">Rød</string>
+    <string name="color_yellow">Gul</string>
+
+    <!-- Talk Screen -->
+    <string name="channel">Kanal</string>
+    <string name="leave_channel_title">Forlate kanal?</string>
+    <string name="leave_channel_confirm">Er du sikker på at du vil forlate kanalen?</string>
+    <string name="leave">Forlat</string>
+    <string name="members">Medlemmer</string>
+    <string name="you_are_transmitting">Du sender</string>
+    <string name="is_speaking">snakker</string>
+    <string name="is_listening">lytter</string>
+    <string name="you_label">%s (Du)</string>
+    <string name="headphones">Hodetelefoner</string>
+    <string name="speaker_on">Høyttaler på</string>
+    <string name="speaker_off">Høyttaler av</string>
+    <string name="quality_poor">Dårlig</string>
+    <string name="quality_fair">Middels</string>
+    <string name="quality_unknown">Ukjent</string>
+    <string name="ping_ms">Ping: %dms</string>
+    <string name="toggle_mode_active">🔒 Kontinuerlig sending aktiv – dra knappen ned for å stoppe</string>
+    <string name="ptt_hint">👆 Trykk og hold eller dra opp for kontinuerlig modus</string>
+    <string name="ptt_no_connection">INGEN TILKOBLING</string>
+    <string name="ptt_locked">KONTINUERLIG SENDING</string>
+    <string name="ptt_transmitting">SENDER</string>
+    <string name="ptt_hold_to_talk">HOLD &amp; SNAKK</string>
+    <string name="ptt">PTT</string>
+    <string name="ok">OK</string>
+    <string name="audio_output">Lydutgang</string>
+    <string name="speaker">Høyttaler</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Innstillinger</string>
+    <string name="back">Tilbake</string>
+    <string name="profile_section">Profil</string>
+    <string name="username">Brukernavn</string>
+    <string name="not_set">Ikke satt</string>
+    <string name="edit_username">Rediger brukernavn</string>
+    <string name="save">Lagre</string>
+    <string name="username_saved">✅ Brukernavn lagret</string>
+    <string name="username_error">❌ Navn må ha minst 2 tegn</string>
+    <string name="audio_section">Lyd</string>
+    <string name="sound_effects">Lydeffekter (på/av)</string>
+    <string name="sound_effects_desc">Walkie-Talkie på/av-lyder ved sending</string>
+    <string name="audio_quality">Lydkvalitet</string>
+    <string name="audio_quality_8khz">8 kHz (Telefonkvalitet)</string>
+    <string name="audio_quality_16khz">16 kHz (Standard)</string>
+    <string name="audio_quality_32khz">32 kHz (Høy kvalitet)</string>
+    <string name="audio_quality_44khz">44.1 kHz (CD-kvalitet)</string>
+    <string name="recommended">(anbefalt)</string>
+    <string name="audio_compression">Lydkomprimering</string>
+    <string name="audio_compression_desc">Reduserer databruk (eksperimentelt)</string>
+    <string name="speaker_default">Høyttaler som standard på</string>
+    <string name="speaker_default_desc">Ved inngang i en kanal</string>
+    <string name="ptt_section">Snakking (PTT)</string>
+    <string name="ptt_mode">PTT-modus</string>
+    <string name="ptt_hold">Trykk og hold</string>
+    <string name="ptt_hold_desc">Send kun mens knappen holdes inne</string>
+    <string name="ptt_toggle">Kontinuerlig (Toggle)</string>
+    <string name="ptt_toggle_desc">Trykk én gang for å starte, trykk igjen for å stoppe</string>
+    <string name="ptt_lock_threshold">Lås terskel</string>
+    <string name="ptt_lock_threshold_desc">%d dp – Dra opp for å låse</string>
+    <string name="vad">Stillhetsdeteksjon (VAD)</string>
+    <string name="vad_desc">Stopp automatisk ved stillhet</string>
+    <string name="vad_sensitivity">Stillhetsfølsomhet</string>
+    <string name="vad_threshold">Terskel: %d</string>
+    <string name="sensitive">Følsom</string>
+    <string name="insensitive">Ufølsom</string>
+    <string name="design_section">Design</string>
+    <string name="appearance">Utseende</string>
+    <string name="system_mode">Følg system</string>
+    <string name="light_mode">Lys</string>
+    <string name="dark_mode">Mørk</string>
+    <string name="server_section">Server</string>
+    <string name="server_url">Server-URL</string>
+    <string name="server_url_default">Standard (App)</string>
+    <string name="edit_server_url">Rediger server-URL</string>
+    <string name="server_url_hint">Endre kun hvis du bruker din egen server.</string>
+    <string name="server_url_saved">🌐 Server-URL lagret (omstart kreves)</string>
+    <string name="info_section">Info</string>
+    <string name="app_version">App-versjon</string>
+    <string name="developed_by">Utviklet av</string>
+    <string name="reset_settings">Tilbakestill alle innstillinger</string>
+    <string name="reset_dialog_title">Tilbakestill innstillinger?</string>
+    <string name="reset_dialog_text">Alle innstillinger vil bli tilbakestilt til standardverdier. Denne handlingen kan ikke angres.</string>
+    <string name="reset">Tilbakestill</string>
+    <string name="reset_success">🔄 Alle innstillinger tilbakestilt</string>
+    <string name="restart_dialog_title">Omstart anbefales</string>
+    <string name="restart_dialog_text">Noen innstillinger (som lydkvalitet) trer først i kraft etter omstart av appen. Vennligst start appen på nytt for å bruke endringene.</string>
+    <string name="edit">Rediger</string>
+    <string name="easy">Enkelt</string>
+    <string name="hard">Vanskelig</string>
+
+    <!-- Language -->
+    <string name="language_section">Språk</string>
+    <string name="language">Språk</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_english">English</string>
+    <string name="language_restart_hint">Språkendring trer i kraft etter omstart av appen</string>
+</resources>
